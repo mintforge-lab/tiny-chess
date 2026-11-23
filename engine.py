@@ -8,8 +8,8 @@ DIRS['Q'] = DIRS['K'] = DIRS['B'] + DIRS['R']
 RAYS = [(d, 'kp' if d in (N + E, N + W) else 'k', 'qb' if d in DIRS['B'] else 'qr') for d in DIRS['Q']]
 LINE = {d * t for d in DIRS['Q'] for t in range(1, 8)}
 
-# PeSTO mg/eg tables, value/4+76
-T = r'''LLLLLLLLdn[d]lTIJNRT\ZRGHONQROPFELKOPNNFFKKJMMTICLGFHRVFLLLLLLLLLLLLLLLLxwtnqmu{dea]ZY`aTROMLMPPONKJJJMLMNJLLKLJONNNOLLJLLLLLLLL"6D@[4H1:B^UR\NH@[U\al^WJPQYU]PRIMPOSQQJFJONQPRHE?IKLPHG2G>DHEGF>BIEDE<3FJFLJFF?FGNNLJGBHMRRRONHHJPRPPMHFKLPNKGFBGJKLGFAE?FHFH@<EM8CFBNJFPHIT[P@HUWVUXULKMQXUUNLJOORTONMLPPPPSPNMPPLNQTLDKHGIIBGHGIJJJHFJKNIKIKHLJLLLNLMKNONPNMLJMOQNNKJIKNNOMJHHHJLMJHEFJFKJHKHTVTY\NTWSTZ\`]RWKQRUPW[PFINRRUJGCFILNJNFAFHHMLKDAHGJLOJ:GILPPNCFONPPOONMOOOOKMNMNNNMMKKKMMOLLLLLMMNMKJJIKLKLJIJHJJLLJJIKJLMLKIMGELSO[WWWFBKLHZSZIHNNSZXZEEHHLPLLJFJJLKMKHLILKLPMCJOLNPKLLHJNHFD@JRRSSQNQHQTVZRTLGNNXXUQNMRRWZVZUHSQXTTVRHEPNNPNMFFDHHFCDDEFAKDGB<RPH>DLOSLGJJKBEJRLHGNRFHGIEDFHC@LEB@AD?HHF@ADHELNJ<AHNNHUO>NERP:CHHIPMHIPPPPVRONPRPQWWOJRRSRTRMHKQRSRNIGKOQRPNJEIMOPMKH?DGIEHFA'''
+# PeSTO mg/eg tables, value/6+76
+T = r'''LLLLLLLL\bV\WaRJKMPQWUPIJNMPPNOHHLKNOMNHHKKJLLRJFLIHJPRHLLLLLLLLLLLLLLLLjifbdbhk\]ZWUUZZQPNMLMOONNLKKKLLMMKLLKLKNMMNNLLKLLLLLLLL0=FDV<J:@EXRPVMIDVRWZbXSJOOURXOPJMONQOPKHJNNOOPIGCJLLOJI:HBFIGIHBFJGGHB<HKHLJHHCHINNLJIEILPPPNMIIKOPOOMIHLLNNLIHEIJKLIHEGDHJHIDAGM>FHEMKHOIJQVODIRSSRTRLKMOTRRMLKNNPRNNMLNNNNPONMNOLMPRLFLJHJJFHJHJKKJIHKKMJLJKJLKLLLMLMLNNNNNLLKLNOMNLJJLMNNLKJJIKLMJJHHJHKJIKIQSQTVNQSPQVVYWPSKOPROTVOHJMPPRKIFHJLNKMHDHIILLKFEIIJLNK@IJLOOMFHNNONNNMMNNNNLLMLMMMMMLKLMLNLLLLLLMMMKKKJKLKLKJKIKKLLJJJLJLLLKJMIGLQNVSSTHFKLIVQUJIMMQUTVHHIILOLLJHJJLKLLJLJLKLNMFKNLMNLLLIJNJHGDJPPPPONOIOQSVPQLIMNTTRONLPPTVSVRIQOTQRRPIHNMNONMHHGIIHFGFGHEKGIEAPOJCFLNQLIKKKFGJPLIIMPHIIJHGHJFDLHFDEFDJJHDEGJHLMKAEINMJRNCMGPN@FIIJNMIJONOORPNNOPNOTSNKPPPPRPLIKPPPPNJILNPPOMJHJMNNMKICFHJGJHE'''
 MG = (82, 337, 365, 477, 1025, 0)
 EG = (94, 281, 297, 512, 936, 0)
 B = 1 << 18  # score = mg + eg*B
@@ -27,7 +27,7 @@ PST, OPP = {}, {}
 for n, p in enumerate('PNBRQK'):
     PST[p], OPP[p.lower()] = [0] * 120, [0] * 120
     for k in range(64):
-        x = MG[n] + (ord(T[n * 128 + k]) - 76) * 4 + (EG[n] + (ord(T[n * 128 + 64 + k]) - 76) * 4) * B
+        x = MG[n] + (ord(T[n * 128 + k]) - 76) * 6 + (EG[n] + (ord(T[n * 128 + 64 + k]) - 76) * 6) * B
         q = 21 + k // 8 * 10 + k % 8
         PST[p][q] = OPP[p.lower()][mr(q)] = x
 
@@ -41,8 +41,8 @@ def flip(b):
 
 
 # board, score, phase, castling, theirs, ep
-START = ('         \n' * 2 + ''.join(' ' + r + '\n' for r in ['rnbqkbnr', 'p' * 8] + ['.' * 8] * 4 + ['P' * 8, 'RNBQKBNR'])
-         + '         \n' * 2, 0, 24, (1, 1), (1, 1), 0)
+START = ('         \n' * 2 + ' rnbqkbnr\n pppppppp\n' + ' ........\n' * 4 + ' PPPPPPPP\n RNBQKBNR\n' + '         \n' * 2,
+         0, 24, (1, 1), (1, 1), 0)
 
 
 def gen(pos, caps=0):
@@ -265,10 +265,11 @@ def think(g):
             i, j = mr(i), mr(j)
         pos = move(pos, i, j, u[4:].upper() or 'Q')
     seen.add(pos[0])
-    white = len(g['moves']) % 2 == 0
-    ms = [m for m in gen(pos) if sq(m[0], white) + sq(m[1], white) + 'q' * (pos[0][m[0]] == 'P' and m[1] < 30) in g['legal_moves']]
+    w = len(g['moves']) % 2 == 0
+    uci = lambda m: sq(m[0], w) + sq(m[1], w) + 'q' * (pos[0][m[0]] == 'P' and m[1] < 30)
+    ms = [m for m in gen(pos) if uci(m) in g['legal_moves']]
     if len(ms) < 2:
-        return ms[0], white
+        return uci(ms[0])
     if len(tt) > 300000:
         tt = {}
     hist = {}
@@ -295,7 +296,7 @@ def think(g):
     except Stop:
         pass
     pool -= nodes
-    return best, white
+    return uci(best)
 
 
 pool, CAP = 30_000_000, 160_000
@@ -312,9 +313,7 @@ while g['status'] != 'done':
     if g['status'] == 'your_move':
         u = g['legal_moves'][0]
         try:
-            m, white = think(g)
-            u = sq(m[0], white) + sq(m[1], white)
-            u += 'q' * (u + 'q' in g['legal_moves'])
+            u = think(g)
         except Exception:
             pass
         g = post('/move', {'game': g['game'], 'move': u})
