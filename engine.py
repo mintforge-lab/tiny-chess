@@ -112,7 +112,13 @@ def move(pos, i, j, pr='Q'):
 def ev(pos):
     b, s, ph = pos[0], pos[1], min(pos[2], 24)
     m = ((s + HB) & MK) - HB
-    return (m * ph + ((s - m) >> 18) * (24 - ph)) // 24 + 30 * ((b.count('B') > 1) - (b.count('b') > 1)) + 8
+    k, o = b.find('K'), b.find('k')
+    # king safety (mg): pawn shield and the queens' distance to the kings
+    t = ((b[k - 11] + b[k - 10] + b[k - 9]).count('P') - (b[o + 9] + b[o + 10] + b[o + 11]).count('p')) * 12
+    for q, x, w in (b.find('q'), k, -8), (b.find('Q'), o, 8):
+        if q > 0:
+            t += w * max(0, 5 - max(abs(q // 10 - x // 10), abs(q % 10 - x % 10)))
+    return (m * ph + ((s - m) >> 18) * (24 - ph) + t * ph) // 24 + 30 * ((b.count('B') > 1) - (b.count('b') > 1)) + 8
 
 
 def att(b, k):
