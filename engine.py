@@ -1,6 +1,6 @@
 import json, os, urllib.request
 
-# 10x12 board, a8=21 h1=98; side to move is uppercase, board flipped each move
+# 10x12 board, a8=21; side to move is uppercase
 N, E, S, W = -10, 1, 10, -1
 DIRS = {'P': (N, N + N, N + W, N + E), 'N': (-19, -8, 12, 21, 19, 8, -12, -21),
         'B': (N + E, S + E, S + W, N + W), 'R': (N, E, S, W)}
@@ -8,11 +8,11 @@ DIRS['Q'] = DIRS['K'] = DIRS['B'] + DIRS['R']
 RAYS = [(d, 'kp' if d in (N + E, N + W) else 'k', 'qb' if d in DIRS['B'] else 'qr') for d in DIRS['Q']]
 LINE = {d * t for d in DIRS['Q'] for t in range(1, 8)}
 
-# PeSTO tables, mg then eg for P N B R Q K, a8..h1: char = value / 4 + 76
+# PeSTO mg/eg tables, value/4+76
 T = r'''LLLLLLLLdn[d]lTIJNRT\ZRGHONQROPFELKOPNNFFKKJMMTICLGFHRVFLLLLLLLLLLLLLLLLxwtnqmu{dea]ZY`aTROMLMPPONKJJJMLMNJLLKLJONNNOLLJLLLLLLLL"6D@[4H1:B^UR\NH@[U\al^WJPQYU]PRIMPOSQQJFJONQPRHE?IKLPHG2G>DHEGF>BIEDE<3FJFLJFF?FGNNLJGBHMRRRONHHJPRPPMHFKLPNKGFBGJKLGFAE?FHFH@<EM8CFBNJFPHIT[P@HUWVUXULKMQXUUNLJOORTONMLPPPPSPNMPPLNQTLDKHGIIBGHGIJJJHFJKNIKIKHLJLLLNLMKNONPNMLJMOQNNKJIKNNOMJHHHJLMJHEFJFKJHKHTVTY\NTWSTZ\`]RWKQRUPW[PFINRRUJGCFILNJNFAFHHMLKDAHGJLOJ:GILPPNCFONPPOONMOOOOKMNMNNNMMKKKMMOLLLLLMMNMKJJIKLKLJIJHJJLLJJIKJLMLKIMGELSO[WWWFBKLHZSZIHNNSZXZEEHHLPLLJFJJLKMKHLILKLPMCJOLNPKLLHJNHFD@JRRSSQNQHQTVZRTLGNNXXUQNMRRWZVZUHSQXTTVRHEPNNPNMFFDHHFCDDEFAKDGB<RPH>DLOSLGJJKBEJRLHGNRFHGIEDFHC@LEB@AD?HHF@ADHELNJ<AHNNHUO>NERP:CHHIPMHIPPPPVRONPRPQWWOJRRSRTRMHKQRSRNIGKOQRPNJEIMOPMKH?DGIEHFA'''
 MG = (82, 337, 365, 477, 1025, 0)
 EG = (94, 281, 297, 512, 936, 0)
-B = 1 << 18  # packed score = mg + eg * B
+B = 1 << 18  # score = mg + eg*B
 HB, MK = B >> 1, B - 1
 PHASE = {'n': 1, 'b': 1, 'r': 2, 'q': 4}
 VAL = dict(zip('.pnbrqkPNBRQK', (0, 1, 3, 3, 5, 9, 99, 1, 3, 3, 5, 9, 99)))
@@ -40,7 +40,7 @@ def flip(b):
     return ''.join([b[k:k + 10] for k in range(110, -1, -10)]).swapcase()
 
 
-# position: board, packed score, phase, our castling (a, h), theirs, ep square
+# board, score, phase, castling, theirs, ep
 START = ('         \n' * 2 + ''.join(' ' + r + '\n' for r in ['rnbqkbnr', 'p' * 8] + ['.' * 8] * 4 + ['P' * 8, 'RNBQKBNR'])
          + '         \n' * 2, 0, 24, (1, 1), (1, 1), 0)
 
@@ -48,28 +48,30 @@ START = ('         \n' * 2 + ''.join(' ' + r + '\n' for r in ['rnbqkbnr', 'p' * 
 def gen(pos, caps=0):
     b, ep, wc = pos[0], pos[5], pos[3]
     for i, p in enumerate(b):
-        if not p.isupper():
+        if not 'A' < p < 'Z':
+            continue
+        if p == 'P':
+            if b[i - 10] == '.':
+                if not caps or i < 40:
+                    yield i, i - 10
+                if not caps and i > 80 and b[i - 20] == '.':
+                    yield i, i - 20
+            for j in (i - 11, i - 9):
+                if b[j] > 'Z' or j == ep:
+                    yield i, j
             continue
         for d in DIRS[p]:
             j = i + d
-            while 1:
-                q = b[j]
-                if q.isspace() or q.isupper():
-                    break
-                if p == 'P':
-                    if d in (N, N + N):
-                        if q != '.' or d == N + N and (i < 81 or b[i + N] != '.'):
-                            break
-                    elif q == '.' and j != ep:
-                        break
-                    if not caps or q != '.' or j < 30 or j == ep:
-                        yield i, j
-                    break
-                if not caps or q != '.':
+            q = b[j]
+            while q == '.':
+                if not caps:
                     yield i, j
-                if q != '.' or p in 'NK':
+                if p in 'NK':
                     break
                 j += d
+                q = b[j]
+            if q > 'Z':
+                yield i, j
         if p == 'K' and not caps:
             if wc[0] and b[91:95] == 'R...':
                 yield i, i - 2
@@ -86,10 +88,8 @@ def move(pos, i, j, pr='Q'):
         ph -= PHASE.get(q, 0)
     b = put(put(b, i, '.'), j, p)
     e = 0
-    if i == 91: wc = 0, wc[1]
-    if i == 98: wc = wc[0], 0
-    if j == 21: bc = 0, bc[1]
-    if j == 28: bc = bc[0], 0
+    wc = wc[0] * (i != 91), wc[1] * (i != 98)
+    bc = bc[0] * (j != 21), bc[1] * (j != 28)
     if p == 'K':
         wc = 0, 0
         if abs(j - i) == 2:
@@ -110,14 +110,12 @@ def move(pos, i, j, pr='Q'):
 
 
 def ev(pos):
-    # tapered eval + tempo
-    s, ph = pos[1], min(pos[2], 24)
+    b, s, ph = pos[0], pos[1], min(pos[2], 24)
     m = ((s + HB) & MK) - HB
-    return (m * ph + ((s - m) >> 18) * (24 - ph)) // 24 + 8
+    return (m * ph + ((s - m) >> 18) * (24 - ph)) // 24 + 30 * ((b.count('B') > 1) - (b.count('b') > 1)) + 8
 
 
 def att(b, k):
-    # is our square k attacked?
     for d in DIRS['N']:
         if b[k + d] == 'n':
             return 1
@@ -158,7 +156,7 @@ def qs(pos, a, b):
         q = bd[j]
         if q == 'k':
             return MATE
-        if j < 30 or st + VAL[q] * 100 + 200 > a:  # delta pruning
+        if j < 30 or st + VAL[q] * 100 + 200 > a:
             ms.append((VAL[q] * 10 - VAL[bd[i]], i, j))
     ms.sort(reverse=True)
     for _, i, j in ms:
@@ -198,6 +196,8 @@ def search(pos, a, b, d, ply, nul=1):
             s = -search((flip(bd), -pos[1], pos[2], pos[4], pos[3], 0), -b, 1 - b, d - 3 - d // 6, ply + 1, 0)
             if s >= b:
                 return s
+    if d > 3 and not tm:  # IIR
+        d -= 1
     ep = pos[5]
     kl = killers[ply]
     ms = []
@@ -219,7 +219,7 @@ def search(pos, a, b, d, ply, nul=1):
         if n and quiet and not chk and o < 1 << 27 and d < 3 and st + 120 * d <= a:  # futility
             continue
         c = move(pos, i, j)
-        if p == 'K' or chk or j == ep or i - k in LINE:  # may expose our king: verify
+        if p == 'K' or chk or j == ep or i - k in LINE:  # check legality
             if p == 'K' and abs(j - i) == 2 and (chk or att(bd, (i + j) // 2)):
                 continue
             f = flip(c[0])
@@ -229,7 +229,7 @@ def search(pos, a, b, d, ply, nul=1):
         if n == 1:
             s = -search(c, -b, -a, d - 1, ply + 1)
         else:
-            r = (1 + (n > 8) + (d > 6)) if d > 2 and n > 3 and quiet and not chk else 0  # late move reduction
+            r = (1 + (n > 8) + (d > 6)) if d > 2 and n > 3 and quiet and not chk else 0  # LMR
             s = -search(c, -a - 1, -a, d - 1 - r, ply + 1)
             if s > a and (r or s < b):
                 s = -search(c, -b, -a, d - 1, ply + 1)
@@ -273,7 +273,7 @@ def think(g):
         tt = {}
     hist = {}
     killers = [[0, 0] for _ in range(99)]
-    # node budget from a trial-wide pool, as if every game left ran to 200 plies
+    # budget from a trial-wide node pool
     left = (201 - g['plies']) // 2 + 96 * (g['games'] - g['game'])
     hard = min(CAP, pool // left)
     nodes = 0
