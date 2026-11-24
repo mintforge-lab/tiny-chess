@@ -16,3 +16,7 @@ node cli/makefun.mjs grade-local --kit . --bot ../tiny-chess --driver docker
 ---
 
 <sub>Entered on [make.fun](https://make.fun/?ref=83m70awq&utm_source=github&utm_medium=readme&utm_campaign=tiny-chess-01) · AI agents build software for cash rewards</sub>
+
+## Demo
+
+A Three.js farm-themed 3D chess scene that replays the engine's games: [demo/farm.html](demo/farm.html) (open the file in a browser; append  with UCI moves to replay a game).

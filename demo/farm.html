@@ -1,0 +1,1548 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Farmyard Chess · Three.js</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #dfeae6;
+    --panel: rgba(36, 40, 28, 0.72);
+    --line: rgba(255, 240, 205, 0.16);
+    --text: #faf3e2;
+    --muted: #c9c1ad;
+    --wheat: #f2c862;
+    --wheat-soft: rgba(242, 200, 98, 0.16);
+    --sage: #b5d99a;
+    --sky: #7fd3ff;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; height: 100%; overflow: hidden;
+    background: var(--bg); color: var(--text);
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  #scene { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; outline: none; }
+
+  .panel {
+    position: fixed; top: 18px; left: 18px; width: 304px; padding: 18px;
+    border: 1px solid var(--line); border-radius: 18px;
+    background: var(--panel);
+    backdrop-filter: blur(14px) saturate(1.2); -webkit-backdrop-filter: blur(14px) saturate(1.2);
+    box-shadow: 0 18px 40px rgba(40, 46, 20, 0.28);
+  }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .mark {
+    width: 42px; height: 42px; flex: 0 0 42px; display: grid; place-items: center;
+    border-radius: 12px; font-size: 25px; line-height: 1;
+    color: var(--wheat); background: var(--wheat-soft); border: 1px solid rgba(242, 200, 98, 0.38);
+  }
+  h1 { margin: 0; font-size: 18px; letter-spacing: -0.02em; }
+  .sub { margin: 3px 0 0; color: var(--muted); font-size: 12.5px; }
+  .eyebrow {
+    margin: 16px 0 8px; font-size: 10.5px; font-weight: 800;
+    letter-spacing: 0.14em; text-transform: uppercase; color: var(--sage);
+  }
+  .families { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .fam {
+    display: flex; align-items: center; gap: 8px; padding: 7px 9px; border-radius: 10px;
+    background: rgba(255, 255, 255, 0.05); border: 1px solid var(--line); font-size: 12px; font-weight: 700;
+  }
+  .fam small { display: block; color: var(--muted); font-weight: 500; font-size: 10.5px; }
+  .sw { width: 16px; height: 16px; border-radius: 5px; flex: 0 0 16px; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.2); }
+  .sw.w { background: linear-gradient(135deg, #f0e3c2 50%, #c0432f 50%); }
+  .sw.b { background: linear-gradient(135deg, #7c9870 50%, #3e5f8c 50%); }
+  .cast { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
+  .cast span {
+    padding: 6px 4px; border-radius: 9px; text-align: center; font-size: 11.5px; font-weight: 600;
+    background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.05); color: #ece3cf;
+  }
+  .cast b { color: var(--wheat); font-weight: 400; margin-right: 3px; }
+  .row { display: flex; gap: 8px; }
+  .btn {
+    flex: 1; border: 1px solid var(--line); border-radius: 10px; padding: 9px 10px; cursor: pointer;
+    background: rgba(255, 255, 255, 0.05); color: var(--text); font: inherit; font-size: 12.5px; font-weight: 700;
+    transition: background 150ms ease, transform 150ms ease;
+  }
+  .btn:hover { transform: translateY(-1px); background: rgba(255, 255, 255, 0.1); }
+  .btn.primary { border-color: rgba(242, 200, 98, 0.45); background: rgba(242, 200, 98, 0.16); color: var(--wheat); }
+  .btn:focus-visible { outline: 3px solid rgba(181, 217, 154, 0.45); outline-offset: 2px; }
+  .status {
+    margin-top: 12px; padding: 10px 12px; border-radius: 12px;
+    background: rgba(255, 255, 255, 0.045); border: 1px solid rgba(255, 255, 255, 0.05);
+    font-size: 12.5px; color: var(--muted); line-height: 1.5; min-height: 40px;
+    font-variant-numeric: tabular-nums;
+  }
+  .status b { color: var(--text); font-weight: 700; }
+  .hint {
+    position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%);
+    width: max-content; max-width: calc(100% - 28px);
+    padding: 9px 15px; border-radius: 999px; border: 1px solid var(--line);
+    background: rgba(36, 40, 28, 0.66); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    color: #efe6d2; font-size: 12px; text-align: center; pointer-events: none;
+  }
+  kbd { font: inherit; font-size: 11px; padding: 1px 5px; border-radius: 5px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.08); }
+  .tip {
+    position: fixed; left: 0; top: 0; pointer-events: none; z-index: 5;
+    padding: 6px 10px; border-radius: 9px; border: 1px solid var(--line);
+    background: rgba(36, 40, 28, 0.9); font-size: 12px; font-weight: 700;
+    opacity: 0; transition: opacity 120ms ease; white-space: nowrap;
+  }
+  .tip span { margin-left: 6px; font-weight: 500; color: var(--muted); }
+  .tip.on { opacity: 1; }
+  .fail { position: fixed; inset: 0; display: none; place-items: center; text-align: center; padding: 30px; color: #444; }
+  @media (max-width: 640px) {
+    .panel { left: 10px; right: 10px; top: 10px; width: auto; padding: 14px; }
+    .cast, .families + .eyebrow { display: none; }
+    .eyebrow { margin-top: 12px; }
+    .hint { bottom: 10px; border-radius: 12px; }
+  }
+</style>
+</head>
+<body>
+<canvas id="scene" tabindex="0" aria-label="Three-dimensional farm-themed chess board in the opening position"></canvas>
+
+<section class="panel" aria-label="Scene controls">
+  <div class="brand">
+    <div class="mark" aria-hidden="true">♞</div>
+    <div>
+      <h1>Farmyard Chess</h1>
+      <p class="sub">Two farm families on a patchwork field. Every character is modeled in code.</p>
+    </div>
+  </div>
+
+  <p class="eyebrow">Families</p>
+  <div class="families">
+    <div class="fam"><i class="sw w"></i><div>Redbarn<small>plays White</small></div></div>
+    <div class="fam"><i class="sw b"></i><div>Sagebrook<small>plays Black</small></div></div>
+  </div>
+
+  <p class="eyebrow">Cast</p>
+  <div class="cast" aria-label="Which character plays which piece">
+    <span><b>♔</b>Farmer</span><span><b>♕</b>Matriarch</span><span><b>♗</b>Scarecrow</span>
+    <span><b>♘</b>Horse</span><span><b>♖</b>Silo</span><span><b>♙</b>Farmhand</span>
+  </div>
+
+  <p class="eyebrow">Scene</p>
+  <div class="row">
+    <button class="btn primary" id="playBtn" type="button">▶ Play opening</button>
+    <button class="btn" id="resetBtn" type="button">Reset</button>
+  </div>
+  <div class="row" style="margin-top:8px">
+    <button class="btn" id="rotateBtn" type="button" aria-pressed="true">Auto-rotate: on</button>
+    <button class="btn" id="viewBtn" type="button">Reset view</button>
+  </div>
+  <div class="status" id="status" aria-live="polite"><b>Opening position</b> · Redbarn (White) to move</div>
+</section>
+
+<div class="hint">Drag to orbit · scroll to zoom · click a character to focus · <kbd>Space</kbd> play · <kbd>R</kbd> rotate · <kbd>Esc</kbd> view</div>
+<div class="tip" id="tip"></div>
+<div class="fail" id="fail">This scene needs WebGL and network access to load Three.js from cdnjs.</div>
+
+<script type="module">
+import * as THREE from 'https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.module.min.js';
+
+const $ = (id) => document.getElementById(id);
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const TAU = Math.PI * 2;
+
+// ---------------------------------------------------------------------------
+// Seeded randomness: field rows, scatter and tints are identical on every load
+// ---------------------------------------------------------------------------
+let seed = 20261123;
+const rand = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
+const hash3 = (x, y, z) => {
+  const s = Math.sin(x * 127.1 + y * 311.7 + z * 74.7) * 43758.5453;
+  return s - Math.floor(s);
+};
+
+// ---------------------------------------------------------------------------
+// Renderer, scene, camera
+// ---------------------------------------------------------------------------
+const canvas = $('scene');
+let renderer;
+try {
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+} catch (err) {
+  $('fail').style.display = 'grid';
+  throw err;
+}
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.08;
+
+const scene = new THREE.Scene();
+scene.background = (() => {
+  // pale morning sky: soft blue overhead, warm cream toward the horizon
+  const c = document.createElement('canvas');
+  c.width = 4; c.height = 512;
+  const g = c.getContext('2d');
+  const grad = g.createLinearGradient(0, 0, 0, 512);
+  grad.addColorStop(0.0, '#9fcbec');
+  grad.addColorStop(0.42, '#cfe5ee');
+  grad.addColorStop(0.74, '#eff0de');
+  grad.addColorStop(1.0, '#f8e2bd');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 4, 512);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+})();
+scene.fog = new THREE.Fog(0xe8efe0, 36, 84);
+
+const camera = new THREE.PerspectiveCamera(42, innerWidth / innerHeight, 0.1, 220);
+scene.add(camera); // the painted sun rides on the camera
+const HOME_TARGET = new THREE.Vector3(0, -0.4, 0);
+const target = HOME_TARGET.clone();
+const goalTarget = HOME_TARGET.clone();
+const HOME = { yaw: 0.52, pitch: 0.68, radius: 24.5 };
+const view = { ...HOME };
+const goal = { ...HOME };
+
+function fitRadius() {
+  const halfW = 8.4; // keep the field and its fence in frame on tall screens
+  const need = halfW / (Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * camera.aspect);
+  return Math.min(40, Math.max(HOME.radius, need));
+}
+
+function updateCamera() {
+  const h = Math.cos(view.pitch) * view.radius;
+  camera.position.set(
+    target.x + Math.sin(view.yaw) * h,
+    target.y + Math.sin(view.pitch) * view.radius,
+    target.z + Math.cos(view.yaw) * h
+  );
+  camera.lookAt(target);
+}
+
+// ---------------------------------------------------------------------------
+// Lighting (dataset recipe): cool-sky / earthy-ground hemisphere, a warm low
+// morning key that is the only shadow caster, and a cool rim from behind.
+// The key comes from the same side as the painted sun in the default view.
+// ---------------------------------------------------------------------------
+scene.add(new THREE.HemisphereLight(0xd6ecff, 0x8a7a4e, 2.15));
+
+const sun = new THREE.DirectionalLight(0xffe4b4, 3.2);
+sun.position.set(12, 11.5, -6);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -14, right: 14, top: 14, bottom: -14, near: 1, far: 52 });
+sun.shadow.bias = -0.0004;
+sun.shadow.normalBias = 0.025;
+scene.add(sun);
+
+const rim = new THREE.DirectionalLight(0xa9d9ff, 1.1);
+rim.position.set(-9, 6, -10);
+scene.add(rim);
+
+// ---------------------------------------------------------------------------
+// Geometry helpers. Every object is built from primitives and baked into one
+// non-indexed BufferGeometry with per-face vertex colours: one draw call per
+// piece / per decor layer, flat normals everywhere, hard facets by construction.
+// ---------------------------------------------------------------------------
+const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _e = new THREE.Euler();
+const _p = new THREE.Vector3(), _s = new THREE.Vector3();
+const UP = new THREE.Vector3(0, 1, 0);
+
+function part(geo, color, t = {}) {
+  const g = geo.index ? geo.toNonIndexed() : geo.clone();
+  geo.dispose();
+  g.deleteAttribute('uv');
+  g.deleteAttribute('normal');
+  if (t.isMatrix4) _m.copy(t);
+  else {
+    _e.set(t.rx || 0, t.ry || 0, t.rz || 0, t.order || 'XYZ');
+    _m.compose(_p.set(t.x || 0, t.y || 0, t.z || 0), _q.setFromEuler(_e), _s.set(t.sx || 1, t.sy || 1, t.sz || 1));
+  }
+  g.applyMatrix4(_m);
+  const c = new THREE.Color(color);
+  const n = g.attributes.position.count;
+  const col = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) { col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b; }
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  return g;
+}
+
+function merge(parts) {
+  let n = 0;
+  for (const g of parts) n += g.attributes.position.count;
+  const pos = new Float32Array(n * 3), col = new Float32Array(n * 3);
+  let o = 0;
+  for (const g of parts) {
+    pos.set(g.attributes.position.array, o * 3);
+    col.set(g.attributes.color.array, o * 3);
+    o += g.attributes.position.count;
+    g.dispose();
+  }
+  const m = new THREE.BufferGeometry();
+  m.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  m.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  m.computeVertexNormals(); // non-indexed => true face normals
+  m.computeBoundingSphere();
+  return m;
+}
+
+// Per-triangle recolour: callback gets (colour, faceNormal, centroid, faceIndex).
+function tintFaces(geo, fn) {
+  const p = geo.attributes.position.array, c = geo.attributes.color.array;
+  const a = new THREE.Vector3(), b = new THREE.Vector3(), d = new THREE.Vector3();
+  const nrm = new THREE.Vector3(), cen = new THREE.Vector3();
+  const col = new THREE.Color();
+  for (let i = 0; i < p.length; i += 9) {
+    a.fromArray(p, i); b.fromArray(p, i + 3); d.fromArray(p, i + 6);
+    nrm.subVectors(d, b).cross(a.clone().sub(b)).normalize();
+    cen.copy(a).add(b).add(d).multiplyScalar(1 / 3);
+    col.fromArray(c, i);
+    fn(col, nrm, cen, i / 9);
+    for (let k = 0; k < 3; k++) col.toArray(c, i + k * 3);
+  }
+  geo.attributes.color.needsUpdate = true;
+  return geo;
+}
+const jitterTint = (amt) => (col, n, cen, i) => col.multiplyScalar(1 - amt / 2 + hash3(cen.x, cen.y + i * 0.001, cen.z) * amt);
+
+const box = (w, h, d, c, t) => part(new THREE.BoxGeometry(w, h, d), c, t);
+const cyl = (rt, rb, h, seg, c, t) => part(new THREE.CylinderGeometry(rt, rb, h, seg), c, t);
+const ico = (r, det, c, t) => part(new THREE.IcosahedronGeometry(r, det), c, t);
+const cone = (r, h, seg, c, t) => part(new THREE.ConeGeometry(r, h, seg), c, t);
+const dome = (r, ws, hs, c, t) => part(new THREE.SphereGeometry(r, ws, hs, 0, TAU, 0, Math.PI / 2), c, t);
+const lathe = (pts, c, segs = 8) =>
+  part(new THREE.LatheGeometry(pts.map(([r, y]) => new THREE.Vector2(r, y)), segs, Math.PI / segs), c);
+const frustum = (topHalf, botHalf, h, c, y) =>
+  part(new THREE.CylinderGeometry(topHalf * Math.SQRT2, botHalf * Math.SQRT2, h, 4, 1), c, { y, ry: Math.PI / 4 });
+
+// A faceted rod between two points (limbs, tool handles, fence rails, braces).
+const _rm = new THREE.Matrix4(), _ra = new THREE.Vector3(), _rb = new THREE.Vector3(), _rq = new THREE.Quaternion();
+function rod(a, b, r, c, seg = 6, rTop = r) {
+  _ra.set(a[0], a[1], a[2]); _rb.set(b[0], b[1], b[2]);
+  const dir = _rb.clone().sub(_ra);
+  const len = dir.length();
+  _rq.setFromUnitVectors(UP, dir.normalize());
+  _rm.compose(_ra.add(_rb).multiplyScalar(0.5), _rq, _s.set(1, 1, 1));
+  return part(new THREE.CylinderGeometry(rTop, r, len, seg), c, _rm);
+}
+// Triangular prism lying along z: furrow ridges and planting rows.
+function prism(len, w, h, c, t) {
+  const s = new THREE.Shape([new THREE.Vector2(-w / 2, 0), new THREE.Vector2(w / 2, 0), new THREE.Vector2(0, h)]);
+  const g = new THREE.ExtrudeGeometry(s, { depth: len, bevelEnabled: false });
+  g.translate(0, 0, -len / 2);
+  return part(g, c, t);
+}
+
+function vertexMaterial(opts = {}) {
+  return new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.82, metalness: 0.02, ...opts });
+}
+function shadowed(mesh, cast = true) { mesh.castShadow = cast; mesh.receiveShadow = true; return mesh; }
+
+// ---------------------------------------------------------------------------
+// Palettes: the Redbarn family (cream + barn red) plays White, the Sagebrook
+// family (sage + denim) plays Black. Each piece keeps the body / trim / accent
+// split of the base set: garment colour, base-disc trim, small gold/amber accents.
+// ---------------------------------------------------------------------------
+const FAM = {
+  w: {
+    name: 'Redbarn', side: 'White',
+    base: 0xf0e3c2, rim: 0xb5412d, main: 0xc0432f, mainDark: 0x8f2f22, second: 0xf3e8cf, accent: 0xf0b93f,
+    bonnet: 0xf6eedc, straw: 0xeacb74, strawDark: 0xcda552, hair: 0xf1ede6, kidHair: [0x6b4528, 0xd9a35a],
+    skin: { k: 0xe7b38f, q: 0xc68a62, p: [0xdba37c, 0x9c6847] },
+    horse: 0xebe5d8, horseShade: 0xd3cab9, mane: 0xa9a194, muzzle: 0x9a8e88,
+    siloBody: 0xb8432f, siloBand: 0xf1e4c6, siloDome: 0xeee3c6,
+  },
+  b: {
+    name: 'Sagebrook', side: 'Black',
+    base: 0x7c9870, rim: 0x3c5644, main: 0x3e5f8c, mainDark: 0x2c4568, second: 0xa9c08f, accent: 0xe3a24a,
+    bonnet: 0x93ad80, straw: 0xd8b968, strawDark: 0xb99445, hair: 0xd9d6cf, kidHair: [0x2b1f17, 0x8a5a33],
+    skin: { k: 0x9e6a48, q: 0xf0c6a2, p: [0xb47e58, 0xe8b996] },
+    horse: 0x5e3d29, horseShade: 0x4b301f, mane: 0x211912, muzzle: 0x2f231a,
+    siloBody: 0x7f9a6c, siloBand: 0x3e5f8c, siloDome: 0x3e5f8c,
+  },
+};
+const B0 = 0.085;          // top of every base disc
+const DEEP = 0x2a1d16;     // eyes, stitches
+const BOOT = 0x4a2f20;
+const WOOD = 0x9c7048, STEEL = 0x9ea6ad;
+
+function baseDisc(p, P) {
+  p.push(cyl(0.39, 0.39, 0.035, 12, P.rim, { y: 0.0175 }));
+  p.push(cyl(0.345, 0.37, 0.05, 12, P.base, { y: 0.06 }));
+}
+function eyes(p, y, z, dx) {
+  for (const s of [-1, 1]) p.push(box(0.032, 0.036, 0.02, DEEP, { x: s * dx, y, z }));
+}
+
+// ---------------------------------------------------------------------------
+// Piece skins. All characters face +z (the opponent is rotated to face -z);
+// the horse is built facing +x and turned per piece.
+// ---------------------------------------------------------------------------
+
+// King: an old farmer with a wide-brim straw hat, bib overalls and a pitchfork.
+function farmer(P) {
+  const p = [];
+  baseDisc(p, P);
+  const skin = P.skin.k;
+  for (const s of [-1, 1]) {
+    p.push(box(0.11, 0.08, 0.16, BOOT, { x: s * 0.08, y: B0 + 0.04, z: 0.02 }));
+    p.push(box(0.11, 0.3, 0.12, P.main, { x: s * 0.078, y: B0 + 0.23 }));
+  }
+  p.push(lathe([[0, 0.44], [0.2, 0.44], [0.235, 0.55], [0.228, 0.62], [0, 0.62]], P.main)); // sturdy belly
+  p.push(lathe([[0, 0.62], [0.228, 0.62], [0.218, 0.74], [0.17, 0.86], [0, 0.87]], P.second)); // shirt
+  p.push(box(0.2, 0.19, 0.04, P.main, { y: 0.7, z: 0.205, rx: -0.12 }));                    // overall bib
+  for (const s of [-1, 1]) {
+    p.push(rod([s * 0.08, 0.79, 0.2], [s * 0.09, 0.865, 0.02], 0.022, P.main, 4));          // straps
+    p.push(rod([s * 0.09, 0.865, 0.02], [s * 0.08, 0.66, -0.2], 0.022, P.main, 4));
+    p.push(box(0.035, 0.035, 0.02, P.accent, { x: s * 0.065, y: 0.765, z: 0.23 }));         // brass buttons
+  }
+  // left arm hangs, right arm grips the pitchfork
+  p.push(rod([-0.2, 0.8, 0], [-0.27, 0.55, 0.04], 0.055, P.second, 6));
+  p.push(ico(0.05, 0, skin, { x: -0.28, y: 0.52, z: 0.05 }));
+  p.push(rod([0.2, 0.8, 0], [0.3, 0.63, 0.1], 0.055, P.second, 6));
+  p.push(ico(0.052, 0, skin, { x: 0.325, y: 0.62, z: 0.11 }));
+  p.push(rod([0.33, B0, 0.11], [0.33, 1.36, 0.11], 0.02, WOOD, 5));
+  p.push(box(0.17, 0.035, 0.035, STEEL, { x: 0.33, y: 1.37, z: 0.11 }));
+  for (const dx of [-0.07, 0, 0.07]) p.push(box(0.022, 0.2, 0.022, STEEL, { x: 0.33 + dx, y: 1.48, z: 0.11 }));
+  // head: white mustache, chin beard, bushy brows
+  p.push(cyl(0.06, 0.07, 0.07, 6, skin, { y: 0.89 }));
+  p.push(ico(0.15, 1, skin, { y: 1.0 }));
+  p.push(box(0.05, 0.06, 0.06, skin, { y: 0.985, z: 0.15 }));
+  eyes(p, 1.03, 0.14, 0.055);
+  for (const s of [-1, 1]) {
+    p.push(box(0.065, 0.022, 0.03, P.hair, { x: s * 0.058, y: 1.068, z: 0.13, rz: s * 0.15 }));
+    p.push(box(0.04, 0.06, 0.05, skin, { x: s * 0.15, y: 1.0 }));
+  }
+  p.push(box(0.17, 0.05, 0.05, P.hair, { y: 0.94, z: 0.125 }));
+  p.push(cone(0.06, 0.1, 5, P.hair, { y: 0.88, z: 0.11, rx: Math.PI }));
+  p.push(box(0.26, 0.08, 0.07, P.hair, { y: 1.05, z: -0.11 }));
+  // wide-brim straw hat with a band in the family colour
+  p.push(cyl(0.3, 0.3, 0.025, 12, P.straw, { y: 1.11 }));
+  p.push(cyl(0.135, 0.16, 0.15, 8, P.straw, { y: 1.19 }));
+  p.push(cyl(0.164, 0.164, 0.045, 8, P.main, { y: 1.145 }));
+  p.push(box(0.11, 0.025, 0.18, P.strawDark, { y: 1.27 }));
+  return merge(p);
+}
+
+// Queen: the farm matriarch: flared dress, apron, sun bonnet, basket of produce.
+function matriarch(P) {
+  const p = [];
+  baseDisc(p, P);
+  const skin = P.skin.q;
+  p.push(lathe([[0, B0], [0.31, B0], [0.29, 0.2], [0.22, 0.46], [0.165, 0.64], [0, 0.64]], P.main));
+  p.push(box(0.27, 0.44, 0.03, P.second, { y: 0.41, z: 0.23, rx: -0.25 }));            // apron
+  p.push(box(0.11, 0.08, 0.015, P.mainDark, { x: 0.04, y: 0.33, z: 0.268, rx: -0.25 })); // apron pocket
+  p.push(cyl(0.172, 0.172, 0.04, 8, P.second, { y: 0.645 }));                          // apron band
+  p.push(box(0.1, 0.06, 0.05, P.second, { y: 0.64, z: -0.18 }));                       // bow at the back
+  p.push(lathe([[0, 0.64], [0.17, 0.64], [0.185, 0.76], [0.15, 0.88], [0, 0.89]], P.main));
+  p.push(lathe([[0, 0.83], [0.172, 0.83], [0.13, 0.9], [0, 0.9]], P.second));          // collar
+  // right forearm carries the basket, left hand rests on the apron
+  p.push(rod([0.17, 0.83, 0], [0.22, 0.66, 0.06], 0.05, P.main, 6));
+  p.push(rod([0.22, 0.66, 0.06], [0.2, 0.62, 0.2], 0.045, P.main, 6));
+  p.push(ico(0.045, 0, skin, { x: 0.19, y: 0.62, z: 0.24 }));
+  p.push(rod([-0.17, 0.83, 0], [-0.2, 0.6, 0.08], 0.05, P.main, 6));
+  p.push(ico(0.045, 0, skin, { x: -0.19, y: 0.57, z: 0.12 }));
+  const wick = 0xb98a4e, wickD = 0x8a6232;
+  p.push(cyl(0.12, 0.09, 0.13, 8, wick, { x: 0.26, y: 0.46, z: 0.17 }));
+  p.push(cyl(0.128, 0.128, 0.025, 8, wickD, { x: 0.26, y: 0.525, z: 0.17 }));
+  p.push(part(new THREE.TorusGeometry(0.105, 0.014, 4, 8, Math.PI), wickD, { x: 0.26, y: 0.53, z: 0.17, ry: 0.5 }));
+  p.push(ico(0.046, 0, 0xd8432c, { x: 0.22, y: 0.555, z: 0.15 }));   // apple
+  p.push(ico(0.046, 0, 0x8fbf4a, { x: 0.3, y: 0.555, z: 0.2 }));     // greens
+  p.push(ico(0.04, 0, 0xf4ead3, { x: 0.29, y: 0.55, z: 0.11, sy: 1.25 })); // egg
+  // head + sun bonnet: a tilted disc frames the face, a crown covers the back
+  p.push(cyl(0.055, 0.065, 0.07, 6, skin, { y: 0.92 }));
+  p.push(ico(0.14, 1, skin, { y: 1.03 }));
+  p.push(box(0.04, 0.05, 0.05, skin, { y: 1.01, z: 0.14 }));
+  eyes(p, 1.05, 0.13, 0.05);
+  for (const s of [-1, 1]) p.push(box(0.04, 0.025, 0.02, 0xe58a7a, { x: s * 0.085, y: 0.995, z: 0.115 }));
+  p.push(cyl(0.215, 0.215, 0.045, 10, P.bonnet, { y: 1.06, z: -0.02, rx: Math.PI / 2 - 0.25 }));
+  p.push(ico(0.16, 1, P.bonnet, { y: 1.07, z: -0.07 }));
+  p.push(box(0.22, 0.07, 0.12, P.bonnet, { y: 0.96, z: -0.12 }));                      // neck curtain
+  for (const s of [-1, 1]) p.push(rod([s * 0.11, 0.99, 0.04], [s * 0.015, 0.905, 0.125], 0.012, P.accent, 4));
+  p.push(box(0.08, 0.035, 0.03, P.accent, { y: 0.9, z: 0.13 }));                       // bonnet bow
+  p.push(ico(0.04, 0, P.accent, { x: 0.13, y: 1.2, z: -0.02 }));                       // flower pin
+  return merge(p);
+}
+
+// Bishop: a scarecrow on a post: patched shirt on a crossbar, straw at the
+// cuffs and hem, a stitched sack head, a pointed straw hat and a crow.
+function scarecrow(P) {
+  const p = [];
+  baseDisc(p, P);
+  const post = 0x8b6a47, burlap = 0xcfb184, twine = 0xc9a35b;
+  const straw = (k) => (k % 2 ? P.straw : P.strawDark);
+  p.push(rod([0, B0 - 0.01, 0], [0, 0.92, 0], 0.04, post, 5));
+  for (let k = 0; k < 6; k++) {
+    const a = k * TAU / 6 + 0.3;
+    p.push(cone(0.03, 0.12, 4, straw(k), { x: Math.sin(a) * 0.06, y: B0 + 0.05, z: Math.cos(a) * 0.06, rx: Math.cos(a) * 0.5, rz: -Math.sin(a) * 0.5 }));
+  }
+  p.push(box(0.7, 0.05, 0.05, post, { y: 0.76 }));
+  p.push(box(0.27, 0.32, 0.17, P.main, { y: 0.66 }));             // shirt body 0.50..0.82
+  p.push(box(0.6, 0.12, 0.12, P.main, { y: 0.76 }));              // sleeves along the crossbar
+  for (const s of [-1, 1]) p.push(box(0.04, 0.135, 0.135, P.mainDark, { x: s * 0.29, y: 0.76 }));
+  p.push(box(0.085, 0.085, 0.012, P.second, { x: -0.06, y: 0.62, z: 0.09 }));   // patches
+  p.push(box(0.07, 0.06, 0.012, P.accent, { x: 0.17, y: 0.775, z: 0.064 }));
+  p.push(box(0.285, 0.03, 0.185, twine, { y: 0.525 }));                        // rope belt
+  for (const s of [-1, 1]) {
+    for (let k = 0; k < 4; k++) {
+      p.push(cone(0.03, 0.13, 4, straw(k), {
+        x: s * 0.365, y: 0.76 + (k % 2 ? 0.03 : -0.035), z: k < 2 ? 0.035 : -0.035, rz: -s * (Math.PI / 2 + 0.35 + (k % 2) * 0.2),
+      }));
+    }
+  }
+  for (let k = 0; k < 5; k++) p.push(cone(0.028, 0.11, 4, straw(k), { x: -0.1 + k * 0.05, y: 0.46, z: k % 2 ? 0.06 : -0.05, rx: Math.PI }));
+  // sack head with stitched X eyes
+  p.push(cyl(0.05, 0.06, 0.08, 6, burlap, { y: 0.85 }));
+  p.push(cyl(0.065, 0.065, 0.025, 6, twine, { y: 0.865 }));
+  p.push(ico(0.13, 1, burlap, { y: 0.95, sy: 1.06 }));
+  for (const s of [-1, 1]) {
+    p.push(box(0.05, 0.013, 0.02, DEEP, { x: s * 0.047, y: 0.975, z: 0.122, rz: 0.785 }));
+    p.push(box(0.05, 0.013, 0.02, DEEP, { x: s * 0.047, y: 0.975, z: 0.122, rz: -0.785 }));
+  }
+  p.push(box(0.1, 0.013, 0.02, DEEP, { y: 0.91, z: 0.118 }));
+  for (let k = 0; k < 4; k++) p.push(box(0.01, 0.03, 0.02, DEEP, { x: -0.035 + k * 0.023, y: 0.91, z: 0.12 }));
+  // pointed straw hat, worn at an angle (a nod to the mitre)
+  p.push(cyl(0.25, 0.27, 0.025, 9, P.straw, { y: 1.04, rz: 0.1 }));
+  p.push(cyl(0.125, 0.135, 0.045, 7, P.main, { y: 1.07, rz: 0.1 }));
+  p.push(cone(0.13, 0.24, 7, P.straw, { x: -0.012, y: 1.17, rz: 0.17 }));
+  for (let k = 0; k < 7; k++) {
+    const a = k * TAU / 7 + 0.2;
+    p.push(cone(0.018, 0.08, 3, P.strawDark, { x: Math.sin(a) * 0.27, y: 1.03 + Math.sin(a) * 0.027, z: Math.cos(a) * 0.27, rx: Math.cos(a) * 1.6, rz: -Math.sin(a) * 1.6 }));
+  }
+  // a crow perched on the left sleeve
+  const crow = 0x26262e;
+  p.push(ico(0.05, 0, crow, { x: -0.2, y: 0.865, z: 0, sz: 1.35 }));
+  p.push(ico(0.036, 0, crow, { x: -0.2, y: 0.915, z: 0.05 }));
+  p.push(cone(0.014, 0.05, 4, 0xe8a03a, { x: -0.2, y: 0.91, z: 0.095, rx: Math.PI / 2 }));
+  p.push(box(0.045, 0.014, 0.08, crow, { x: -0.2, y: 0.875, z: -0.075, rx: -0.4 }));
+  return merge(p);
+}
+
+// Knight: a farm horse: barrel body, four legs and hooves, arched neck,
+// long head with a muzzle, ears, a mane, a tail and a family saddle blanket.
+function horse(P) {
+  const h = [];
+  const body = P.horse, shade = P.horseShade, mane = P.mane;
+  for (const sx of [-1, 1]) {
+    for (const sz of [-1, 1]) {
+      h.push(box(0.075, 0.34, 0.075, sz > 0 ? body : shade, { x: sx * 0.16, y: 0.2, z: sz * 0.075 }));
+      h.push(box(0.088, 0.05, 0.088, 0x2b2520, { x: sx * 0.16, y: 0.025, z: sz * 0.075 }));
+    }
+  }
+  h.push(part(new THREE.CylinderGeometry(0.13, 0.13, 0.42, 7), body, { y: 0.46, rz: Math.PI / 2 }));
+  h.push(ico(0.14, 0, body, { x: 0.18, y: 0.48 }));
+  h.push(ico(0.145, 0, body, { x: -0.19, y: 0.49 }));
+  // neck rises forward, head angles down toward the muzzle
+  h.push(box(0.13, 0.34, 0.12, body, { x: 0.27, y: 0.66, rz: -0.5 }));
+  const hd = [0.66, -0.75], up = [0.75, 0.66], poll = [0.33, 0.87];
+  const along = (t, u = 0) => [poll[0] + hd[0] * t + up[0] * u, poll[1] + hd[1] * t + up[1] * u];
+  const headRz = Math.atan2(hd[1], hd[0]);
+  let q = along(0.14);
+  h.push(box(0.3, 0.13, 0.12, body, { x: q[0], y: q[1], rz: headRz }));
+  q = along(0.27);
+  h.push(box(0.1, 0.122, 0.13, P.muzzle, { x: q[0], y: q[1], rz: headRz }));
+  q = along(0.315, 0.01);
+  for (const s of [-1, 1]) h.push(box(0.02, 0.03, 0.025, DEEP, { x: q[0], y: q[1], z: s * 0.035, rz: headRz }));
+  q = along(0.05, 0.03);
+  for (const s of [-1, 1]) h.push(box(0.04, 0.04, 0.02, DEEP, { x: q[0], y: q[1], z: s * 0.062, rz: headRz }));
+  q = along(0.17, 0);
+  h.push(box(0.03, 0.14, 0.13, P.accent, { x: q[0], y: q[1], rz: headRz })); // halter band
+  for (const s of [-1, 1]) h.push(cone(0.03, 0.1, 4, shade, { x: 0.33, y: 0.95, z: s * 0.04, rz: 0.3, rx: s * 0.15 }));
+  // mane: a strip along the back of the neck with jagged tufts, plus a forelock
+  h.push(box(0.06, 0.4, 0.05, mane, { x: 0.205, y: 0.705, rz: -0.5 }));
+  for (let k = 0; k < 4; k++) {
+    const t = k / 3;
+    h.push(box(0.07, 0.06, 0.045, mane, { x: 0.13 + t * 0.15 - 0.03, y: 0.56 + t * 0.29, rz: -0.9 }));
+  }
+  h.push(box(0.05, 0.08, 0.05, mane, { x: 0.38, y: 0.92, rz: -1.0 }));
+  // tail
+  h.push(rod([-0.3, 0.55, 0], [-0.38, 0.22, 0], 0.03, mane, 5, 0.06));
+  h.push(cone(0.06, 0.1, 5, mane, { x: -0.385, y: 0.17, rx: Math.PI }));
+  // saddle blanket in the family colour, trimmed in the light family tone
+  h.push(box(0.22, 0.2, 0.29, P.main, { y: 0.53 }));
+  h.push(box(0.225, 0.03, 0.295, P.second, { y: 0.445 }));
+  const g = merge(h);
+  g.scale(0.86, 0.86, 0.86);
+  g.translate(-0.06, B0, 0);
+  const p = [g];
+  baseDisc(p, P);
+  return merge(p);
+}
+
+// Rook: a grain silo: banded cylinder, domed cap with a vent, ladder, footing.
+function silo(P) {
+  const p = [];
+  baseDisc(p, P);
+  p.push(cyl(0.29, 0.3, 0.05, 10, 0xa8a29a, { y: B0 + 0.025 }));
+  p.push(cyl(0.235, 0.235, 0.66, 10, P.siloBody, { y: B0 + 0.05 + 0.33 }));
+  for (const y of [0.3, 0.47, 0.64, 0.785]) p.push(cyl(0.244, 0.244, 0.032, 10, P.siloBand, { y }));
+  p.push(dome(0.245, 10, 4, P.siloDome, { y: 0.795 }));
+  p.push(cyl(0.05, 0.06, 0.07, 6, P.siloBand, { y: 1.07 }));
+  p.push(cone(0.085, 0.07, 6, P.accent, { y: 1.135 }));
+  const ladder = 0x5b5650;
+  for (const s of [-1, 1]) p.push(box(0.018, 0.74, 0.018, ladder, { x: s * 0.05, y: 0.5, z: 0.25 }));
+  for (let k = 0; k < 7; k++) p.push(box(0.1, 0.014, 0.014, ladder, { y: 0.2 + k * 0.1, z: 0.25 }));
+  p.push(box(0.02, 0.2, 0.13, P.mainDark, { x: 0.232, y: 0.25 }));    // hatch
+  return merge(p);
+}
+
+// Pawn: a farmhand kid in overalls and a ball cap (visor marks the front).
+function farmhand(P, v) {
+  const p = [];
+  baseDisc(p, P);
+  const skin = P.skin.p[v];
+  for (const s of [-1, 1]) {
+    p.push(box(0.085, 0.06, 0.12, BOOT, { x: s * 0.055, y: B0 + 0.03, z: 0.015 }));
+    p.push(box(0.085, 0.17, 0.09, P.main, { x: s * 0.055, y: B0 + 0.145 }));
+  }
+  p.push(lathe([[0, 0.3], [0.145, 0.3], [0.155, 0.4], [0.15, 0.43], [0, 0.43]], P.main));
+  p.push(lathe([[0, 0.43], [0.15, 0.43], [0.14, 0.5], [0.11, 0.56], [0, 0.565]], P.second));
+  p.push(box(0.13, 0.11, 0.03, P.main, { y: 0.47, z: 0.14, rx: -0.12 }));
+  for (const s of [-1, 1]) {
+    p.push(rod([s * 0.05, 0.52, 0.13], [s * 0.06, 0.565, 0.0], 0.016, P.main, 4));
+    p.push(rod([s * 0.14, 0.53, 0], [s * 0.175, 0.37, 0.035], 0.04, P.second, 6));
+    p.push(ico(0.04, 0, skin, { x: s * 0.178, y: 0.34, z: 0.04 }));
+  }
+  p.push(ico(0.125, 1, skin, { y: 0.67 }));
+  p.push(box(0.035, 0.04, 0.04, skin, { y: 0.655, z: 0.125 }));
+  eyes(p, 0.685, 0.117, 0.045);
+  p.push(box(0.19, 0.07, 0.07, P.kidHair[v], { y: 0.64, z: -0.09 }));
+  p.push(dome(0.132, 8, 3, P.main, { y: 0.69, rx: -0.12 }));
+  p.push(box(0.15, 0.022, 0.11, P.main, { y: 0.7, z: 0.165, rx: 0.1 }));
+  p.push(ico(0.022, 0, P.accent, { y: 0.825, z: -0.015 }));
+  return merge(p);
+}
+
+const GEO = {};
+for (const c of 'wb') {
+  const P = FAM[c];
+  GEO[c + 'k'] = farmer(P);
+  GEO[c + 'q'] = matriarch(P);
+  GEO[c + 'b'] = scarecrow(P);
+  GEO[c + 'n'] = horse(P);
+  GEO[c + 'r'] = silo(P);
+  GEO[c + 'p0'] = farmhand(P, 0);
+  GEO[c + 'p1'] = farmhand(P, 1);
+}
+
+// ---------------------------------------------------------------------------
+// Board: a raised-bed patchwork field. Light squares are wheat or barley,
+// dark squares are tilled soil or planted crop, assigned in 2x2 blocks with
+// the row direction flipping block to block like neighbouring fields.
+// ---------------------------------------------------------------------------
+const TILE_TOP = 0.12;
+const sqToXZ = (f, r) => [f - 3.5, 3.5 - r];
+const FIELD = {
+  soil:   { top: 0x553620, ridge: 0x7a5234 },
+  crop:   { top: 0x4d6a2c, ridge: 0x5b4227, plant: [0x5f9e3a, 0x6fae44, 0x51903a] },
+  wheat:  { top: 0xcfa548, ridge: 0xdfba58, ear: 0xf0d27a },
+  barley: { top: 0xe0ca8c, ridge: 0xead79e, ear: 0xf6e7b6 },
+};
+
+const boardGroup = new THREE.Group();
+scene.add(boardGroup);
+{
+  const wood = 0x8d5c37, woodDark = 0x5e3b22;
+  const frame = [
+    frustum(5.0, 5.3, 0.35, 0x6b4a2e, -0.475),
+    box(8.1, 0.3, 8.1, 0x3f2a19, { y: -0.15 }),
+  ];
+  for (const s of [-1, 1]) {
+    frame.push(box(9.44, 0.47, 0.69, wood, { z: s * 4.375, y: -0.065 }));
+    frame.push(box(0.69, 0.47, 8.06, wood, { x: s * 4.375, y: -0.065 }));
+    for (const y of [-0.15, 0.02]) {           // plank seams on the outside faces
+      frame.push(box(9.46, 0.018, 0.02, woodDark, { z: s * 4.72, y }));
+      frame.push(box(0.02, 0.018, 9.46, woodDark, { x: s * 4.72, y }));
+    }
+  }
+  for (const sx of [-1, 1]) {
+    for (const sz of [-1, 1]) {
+      frame.push(box(0.32, 0.6, 0.32, woodDark, { x: sx * 4.56, y: -0.04, z: sz * 4.56 }));
+      frame.push(box(0.36, 0.05, 0.36, 0x4a2e1b, { x: sx * 4.56, y: 0.27, z: sz * 4.56 }));
+    }
+  }
+  const frameGeo = tintFaces(merge(frame), jitterTint(0.08));
+  boardGroup.add(shadowed(new THREE.Mesh(frameGeo, vertexMaterial({ roughness: 0.8 }))));
+
+  const tiles = [], detail = [];
+  const tint = (hex, amt = 0.08) => new THREE.Color(hex).multiplyScalar(1 - amt / 2 + rand() * amt);
+  for (let r = 0; r < 8; r++) {
+    for (let f = 0; f < 8; f++) {
+      const [x, z] = sqToXZ(f, r);
+      const light = (f + r) % 2 === 1;
+      const blk = ((f >> 1) + (r >> 1)) % 2;
+      const kind = light ? (blk ? 'barley' : 'wheat') : (blk ? 'crop' : 'soil');
+      const F = FIELD[kind];
+      const alongX = hash3(f >> 1, r >> 1, 9) > 0.5;
+      const at = (along, across) => (alongX ? { x: x + along, z: z + across, ry: Math.PI / 2 } : { x: x + across, z: z + along });
+      tiles.push(box(0.97, 0.12, 0.97, tint(F.top), { x, y: 0.06, z }));
+      if (kind === 'soil') {
+        for (let k = 0; k < 5; k++) detail.push(prism(0.92, 0.15, 0.045, tint(F.ridge, 0.14), { ...at(0, (k - 2) * 0.185), y: TILE_TOP - 0.005 }));
+      } else if (kind === 'crop') {
+        for (let k = 0; k < 3; k++) {
+          detail.push(prism(0.92, 0.16, 0.03, tint(F.ridge), { ...at(0, (k - 1) * 0.3), y: TILE_TOP - 0.005 }));
+          for (let j = 0; j < 4; j++) {
+            const pos = at((j - 1.5) * 0.22 + (rand() - 0.5) * 0.04, (k - 1) * 0.3);
+            detail.push(ico(0.07 + rand() * 0.015, 0, tint(F.plant[(j + k) % 3], 0.12),
+              { x: pos.x, z: pos.z, y: TILE_TOP + 0.035, sy: 0.7, ry: rand() * TAU }));
+          }
+        }
+      } else {
+        for (let k = 0; k < 4; k++) {
+          detail.push(prism(0.92, 0.16, 0.035, tint(F.ridge), { ...at(0, (k - 1.5) * 0.23), y: TILE_TOP - 0.005 }));
+          for (let j = 0; j < 6; j++) {
+            const pos = at((j - 2.5) * 0.15 + (rand() - 0.5) * 0.03, (k - 1.5) * 0.23 + (rand() - 0.5) * 0.03);
+            detail.push(cone(0.022, 0.07, 3, tint(F.ear, 0.12),
+              { x: pos.x, z: pos.z, y: TILE_TOP + 0.038, rx: (rand() - 0.5) * 0.35, rz: (rand() - 0.5) * 0.35, ry: rand() * TAU }));
+          }
+        }
+      }
+    }
+  }
+  const tileMesh = new THREE.Mesh(merge(tiles), vertexMaterial({ roughness: 0.92 }));
+  tileMesh.receiveShadow = true;
+  const detailMesh = shadowed(new THREE.Mesh(merge(detail), vertexMaterial({ roughness: 0.88 })));
+  boardGroup.add(tileMesh, detailMesh);
+
+  // Coordinate letters painted on the raised-bed planks, readable from each side
+  const labelGeo = new THREE.PlaneGeometry(0.42, 0.42);
+  const labelMat = {};
+  const label = (text) => {
+    if (labelMat[text]) return labelMat[text];
+    const c = document.createElement('canvas');
+    c.width = c.height = 64;
+    const g = c.getContext('2d');
+    g.fillStyle = '#f7ebcf';
+    g.font = '800 42px ui-sans-serif, system-ui, sans-serif';
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText(text, 32, 35);
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;
+    t.anisotropy = 4;
+    return (labelMat[text] = new THREE.MeshBasicMaterial({ map: t, transparent: true, opacity: 0.88, depthWrite: false }));
+  };
+  const place = (text, x, z, rotZ) => {
+    const m = new THREE.Mesh(labelGeo, label(text));
+    m.rotation.set(-Math.PI / 2, 0, rotZ);
+    m.position.set(x, 0.177, z);
+    boardGroup.add(m);
+  };
+  for (let i = 0; i < 8; i++) {
+    const file = 'abcdefgh'[i], rank = String(i + 1);
+    place(file, i - 3.5, 4.38, 0);
+    place(file, i - 3.5, -4.38, Math.PI);
+    place(rank, -4.38, 3.5 - i, 0);
+    place(rank, 4.38, 3.5 - i, Math.PI);
+  }
+}
+
+// Last-move highlight: sky-blue fill + bright frame (amber would vanish on wheat)
+const HI_Y = TILE_TOP + 0.082;
+const hiFillMat = new THREE.MeshBasicMaterial({ color: 0x5ccfff, transparent: true, opacity: 0.4, depthWrite: false });
+const hiFrameMat = new THREE.MeshBasicMaterial({ color: 0xeefbff, transparent: true, opacity: 0.95, depthWrite: false });
+const hiFillGeo = new THREE.PlaneGeometry(0.97, 0.97).rotateX(-Math.PI / 2);
+const hiFrameGeo = merge([
+  box(0.97, 0.012, 0.05, 0xffffff, { z: 0.46 }), box(0.97, 0.012, 0.05, 0xffffff, { z: -0.46 }),
+  box(0.05, 0.012, 0.87, 0xffffff, { x: 0.46 }), box(0.05, 0.012, 0.87, 0xffffff, { x: -0.46 }),
+]);
+const hiFrom = new THREE.Group(), hiTo = new THREE.Group();
+for (const h of [hiFrom, hiTo]) {
+  const fill = new THREE.Mesh(hiFillGeo, hiFillMat), frame = new THREE.Mesh(hiFrameGeo, hiFrameMat);
+  fill.renderOrder = frame.renderOrder = 2;
+  h.add(fill, frame);
+  h.visible = false;
+  scene.add(h);
+}
+function highlight(from, to) {
+  for (const [h, s] of [[hiFrom, from], [hiTo, to]]) {
+    if (s == null) { h.visible = false; continue; }
+    const [x, z] = sqToXZ(s % 8, s >> 3);
+    h.position.set(x, HI_Y, z);
+    h.visible = true;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// The farm: a floating chunk of meadow with soil strata, a worm (split-rail)
+// fence, crop rows past the board, hay, a pond, a trough, wind pump, barn.
+// Static decor is merged into ONE mesh; water, the fan and clouds are separate.
+// ---------------------------------------------------------------------------
+const GROUND = -0.65;
+const ISL_R = 12.2, FENCE_R = 11.0;
+const edgeJit = (a) => 1 + 0.035 * Math.sin(3 * a + 1.3) + 0.025 * Math.sin(7 * a + 0.4);
+
+const decor = new THREE.Group();
+scene.add(decor);
+{
+  const H = 2.9, SEG = 28;
+  const side = new THREE.CylinderGeometry(ISL_R, 2.4, H, SEG, 4);
+  const pos = side.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+    const r = Math.hypot(x, z), a = Math.atan2(z, x);
+    if (y > H / 2 - 1e-3) {
+      if (r > 0.01) { const k = edgeJit(a); pos.setX(i, x * k); pos.setZ(i, z * k); }
+    } else if (y < -H / 2 + 1e-3) {
+      if (r < 0.01) pos.setY(i, y - 1.6);
+    } else {
+      const k = edgeJit(a) * (1 + (hash3(x, y, z) - 0.5) * 0.14);
+      pos.setX(i, x * k); pos.setZ(i, z * k); pos.setY(i, y + (hash3(z, x, y + 3.1) - 0.5) * 0.35);
+    }
+  }
+  // meadow top: a polar grid aligned with the cylinder rim, mottled per face
+  const top = new THREE.RingGeometry(0.4, ISL_R, SEG, 9, -Math.PI / 2, TAU).rotateX(-Math.PI / 2);
+  const tp = top.attributes.position;
+  for (let i = 0; i < tp.count; i++) {
+    const x = tp.getX(i), z = tp.getZ(i);
+    const k = edgeJit(Math.atan2(z, x));
+    tp.setX(i, x * k); tp.setZ(i, z * k);
+  }
+  const geo = merge([part(side, 0xffffff, { y: GROUND - H / 2 }), part(top, 0xffffff, { y: GROUND + 0.004 })]);
+  const grass = [0x86b65a, 0x7aab52, 0x90bf63, 0x78a64e].map((h) => new THREE.Color(h));
+  const topsoil = new THREE.Color(0x6b4a2e), clay = new THREE.Color(0xb0844f), stone = new THREE.Color(0x8d8379), deep = new THREE.Color(0x645c66);
+  tintFaces(geo, (col, n, cen, i) => {
+    if (n.y > 0.9) col.copy(grass[Math.floor(hash3(cen.x, 0, cen.z) * 4)]);
+    else if (cen.y > GROUND - 0.5) col.copy(topsoil);
+    else if (cen.y > GROUND - 1.35) col.copy(clay).lerp(topsoil, 0.25 * hash3(i, 1, 2));
+    else col.copy(stone).lerp(deep, THREE.MathUtils.clamp((GROUND - 1.35 - cen.y) / 3, 0, 1));
+    col.multiplyScalar(0.94 + hash3(i, cen.y, 1.7) * 0.1);
+  });
+  decor.add(shadowed(new THREE.Mesh(geo, vertexMaterial({ roughness: 0.95 })), false));
+}
+
+const D = [];     // static decor parts -> one mesh
+const WATER = []; // pond + trough water -> one mesh
+const put = (parts, x, z, ry = 0, s = 1, y = GROUND) => {
+  _m.compose(_p.set(x, y, z), _q.setFromEuler(_e.set(0, ry, 0)), _s.set(s, s, s));
+  for (const g of parts) { g.applyMatrix4(_m); D.push(g); }
+};
+
+// keep-out zones for the seeded scatter (flowers, tufts)
+const BLOCK = [];
+const blocked = (x, z, pad = 0) => {
+  if (Math.abs(x) < 5.6 + pad && Math.abs(z) < 5.6 + pad) return true;
+  if (Math.hypot(x, z) > FENCE_R - 0.5) return true;
+  return BLOCK.some((b) => (b.r ? Math.hypot(x - b.x, z - b.z) < b.r + pad
+    : x > b.x0 - pad && x < b.x1 + pad && z > b.z0 - pad && z < b.z1 + pad));
+};
+
+// --- crop rows beyond the board: cabbages + young corn to the east, wheat to the north
+{
+  BLOCK.push({ x0: 5.6, x1: 8.9, z0: -4.1, z1: 4.1 }, { x0: -4.9, x1: 1.3, z0: -8.0, z1: -5.6 });
+  for (let i = 0; i < 6; i++) {
+    const x = 6.0 + i * 0.52;
+    D.push(prism(7.6, 0.34, 0.08, 0x6a4529, { x, y: GROUND, z: 0 }));
+    for (let j = 0; j < 16; j++) {
+      const z = -3.6 + j * 0.48 + (rand() - 0.5) * 0.06;
+      if (i < 3) {
+        D.push(ico(0.15 + rand() * 0.04, 0, [0x6fae44, 0x5f9e3a, 0x86bf58][(i + j) % 3], { x, y: GROUND + 0.13, z, sy: 0.72, ry: rand() * TAU }));
+      } else {
+        const h = 0.55 + rand() * 0.25;
+        D.push(cone(0.035, h, 4, 0x6c9a3c, { x, y: GROUND + h / 2 + 0.04, z }));
+        for (const s of [-1, 1]) D.push(box(0.26, 0.012, 0.06, 0x7fae4a, { x: x + s * 0.1, y: GROUND + h * 0.45, z, rz: s * 0.5, ry: rand() * 0.6 }));
+        if (j % 2) D.push(box(0.05, 0.12, 0.05, 0xe8c64e, { x: x + 0.04, y: GROUND + h * 0.6, z: z + 0.02, rz: -0.3 }));
+      }
+    }
+  }
+  for (let i = 0; i < 5; i++) {
+    const z = -5.95 - i * 0.44;
+    D.push(prism(6.0, 0.3, 0.06, 0x8a6538, { x: -1.8, y: GROUND, z, ry: Math.PI / 2 }));
+    for (let j = 0; j < 30; j++) {
+      const x = -4.7 + j * 0.2 + (rand() - 0.5) * 0.06, lean = (rand() - 0.5) * 0.25 + 0.12;
+      const h = 0.38 + rand() * 0.12;
+      D.push(cone(0.03, h, 3, 0xcda048, { x, y: GROUND + h / 2 + 0.03, z: z + (rand() - 0.5) * 0.08, rz: lean, ry: rand() * TAU }));
+      D.push(ico(0.04, 0, 0xf0d27a, { x: x - Math.sin(lean) * h * 0.95, y: GROUND + h + 0.05, z, sy: 2.0, rz: lean }));
+    }
+  }
+}
+
+// --- worm fence: zig-zag split rails stacked three high, gate gap at the front
+{
+  const N = 46;
+  for (let i = 0; i < N; i++) {
+    const a0 = i / N * TAU, a1 = (i + 1) / N * TAU;
+    const mid = (a0 + a1) / 2;
+    if (Math.abs(mid - Math.PI / 2) < 0.2) continue;
+    const r0 = FENCE_R + (i % 2 ? 0.26 : -0.26), r1 = FENCE_R + ((i + 1) % 2 ? 0.26 : -0.26);
+    const x0 = Math.cos(a0) * r0, z0 = Math.sin(a0) * r0, x1 = Math.cos(a1) * r1, z1 = Math.sin(a1) * r1;
+    const dx = (x1 - x0) * 0.09, dz = (z1 - z0) * 0.09;
+    for (let k = 0; k < 3; k++) {
+      const y = GROUND + 0.16 + k * 0.23 + (i % 2) * 0.07;
+      const c = new THREE.Color(0x9c8566).multiplyScalar(0.82 + rand() * 0.3);
+      D.push(rod([x0 - dx, y, z0 - dz], [x1 + dx, y + (rand() - 0.5) * 0.04, z1 + dz], 0.055, c, 5));
+    }
+  }
+}
+
+// --- hay: a stack of square bales and a few round bales
+{
+  const bale = () => [
+    box(0.9, 0.46, 0.5, 0xdcbc62, { y: 0.23 }),
+    box(0.05, 0.47, 0.51, 0xa88a45, { x: -0.22, y: 0.23 }),
+    box(0.05, 0.47, 0.51, 0xa88a45, { x: 0.22, y: 0.23 }),
+  ];
+  const round = () => [cyl(0.5, 0.5, 0.8, 12, 0xd4b35a, { y: 0.5, rz: Math.PI / 2 }), cyl(0.34, 0.34, 0.82, 12, 0xe7cd80, { y: 0.5, rz: Math.PI / 2 })];
+  const sx = 6.9, sz = 6.3, ry = -0.7, c = Math.cos(ry), s = Math.sin(ry);
+  const L = (lx, lz) => [sx + lx * c + lz * s, sz - lx * s + lz * c];
+  for (const [lx, lz, ly, r] of [[-0.47, -0.26, 0, 0], [0.47, -0.26, 0, 0], [-0.47, 0.27, 0, 0], [0.47, 0.27, 0, 0], [0, 0, 0.46, 0.08], [0.15, 0.62, 0, 0.5]]) {
+    const [x, z] = L(lx, lz);
+    put(bale(), x, z, ry + r, 1, GROUND + ly);
+  }
+  put(round(), 4.5, 8.5, 0.4);
+  put(round(), -3.4, -9.5, 1.3);
+  put(round(), -2.3, -9.7, 1.1, 0.9);
+  BLOCK.push({ x: 6.9, z: 6.3, r: 1.5 }, { x: 4.5, z: 8.5, r: 0.9 }, { x: -2.9, z: -9.6, r: 1.4 });
+}
+
+// --- pond with a muddy bank, stones, reeds, lily pads and a duck
+const POND = { x: -7.3, z: 3.4 };
+{
+  const pts = [], bank = [];
+  for (let i = 0; i < 12; i++) {
+    const a = i / 12 * TAU, r = 1.75 * (0.85 + rand() * 0.3);
+    pts.push(new THREE.Vector2(Math.cos(a) * r, Math.sin(a) * r));
+    bank.push(new THREE.Vector2(Math.cos(a) * (r + 0.35), Math.sin(a) * (r + 0.35)));
+  }
+  const slab = (shape, depth) => new THREE.ExtrudeGeometry(new THREE.Shape(shape), { depth, bevelEnabled: false }).rotateX(-Math.PI / 2);
+  D.push(part(slab(bank, 0.02), 0x7d6143, { x: POND.x, y: GROUND, z: POND.z }));
+  WATER.push(part(slab(pts, 0.04), 0x6bb9d2, { x: POND.x, y: GROUND, z: POND.z }));
+  for (let i = 0; i < 12; i++) {
+    if (i % 3 === 1) continue;
+    const p = bank[i];
+    D.push(ico(0.15 + rand() * 0.12, 0, [0x9a948a, 0x8a8478, 0xaaa496][i % 3], { x: POND.x + p.x, y: GROUND + 0.05, z: POND.z - p.y, sy: 0.6, ry: rand() * 3 }));
+  }
+  for (let k = 0; k < 14; k++) {
+    const a = 2.3 + rand() * 1.2, r = 1.55 + rand() * 0.35, h = 0.55 + rand() * 0.45;
+    const x = POND.x + Math.cos(a) * r, z = POND.z - Math.sin(a) * r;
+    D.push(cone(0.022, h, 3, 0x4f7d3a, { x, y: GROUND + h / 2, z, rz: (rand() - 0.5) * 0.2 }));
+    if (k % 3 === 0) D.push(cyl(0.032, 0.032, 0.13, 5, 0x6a4127, { x, y: GROUND + h * 0.8, z }));
+  }
+  for (const [lx, lz] of [[0.6, 0.4], [-0.3, -0.7], [0.9, -0.3]]) {
+    D.push(cyl(0.2, 0.2, 0.015, 7, 0x5e9a3e, { x: POND.x + lx, y: GROUND + 0.05, z: POND.z + lz, ry: rand() * TAU }));
+  }
+  D.push(ico(0.04, 0, 0xf2b8c8, { x: POND.x + 0.62, y: GROUND + 0.08, z: POND.z + 0.42 }));
+  const duck = [
+    ico(0.13, 0, 0xf6f2e6, { y: 0.09, sx: 1.35, sy: 0.7 }),
+    ico(0.075, 0, 0xf6f2e6, { x: 0.12, y: 0.21 }),
+    box(0.07, 0.022, 0.05, 0xf0a73c, { x: 0.205, y: 0.2 }),
+    cone(0.05, 0.1, 4, 0xf6f2e6, { x: -0.17, y: 0.14, rz: 1.1 }),
+    box(0.02, 0.02, 0.02, DEEP, { x: 0.16, y: 0.235, z: 0.05 }), box(0.02, 0.02, 0.02, DEEP, { x: 0.16, y: 0.235, z: -0.05 }),
+  ];
+  put(duck, POND.x - 0.4, POND.z + 0.3, 0.6, 1, GROUND + 0.03);
+  BLOCK.push({ x: POND.x, z: POND.z, r: 2.6 });
+}
+
+// --- orchard trees with apples
+function appleTree(x, z, s) {
+  const p = [cyl(0.12 * s, 0.17 * s, 1.2 * s, 6, 0x6e4a33, { y: 0.6 * s })];
+  const blobs = [[0, 1.75, 0, 0.95], [0.5, 1.45, 0.3, 0.65], [-0.45, 1.55, -0.25, 0.6]];
+  blobs.forEach(([bx, by, bz, br], i) => p.push(ico(br * s, 0, [0x6aa24a, 0x5d9540, 0x77ad52][i], { x: bx * s, y: by * s, z: bz * s, sy: 0.88, ry: rand() * 3 })));
+  for (let k = 0; k < 9; k++) {
+    const [bx, by, bz, br] = blobs[k % 3];
+    const u = rand() * TAU, v = rand() * 1.2 - 0.3;
+    p.push(ico(0.075 * s, 0, 0xd8432c, { x: (bx + Math.cos(u) * Math.cos(v) * br) * s, y: (by + Math.sin(v) * br * 0.85) * s, z: (bz + Math.sin(u) * Math.cos(v) * br) * s }));
+  }
+  put(p, x, z, rand() * TAU);
+  BLOCK.push({ x, z, r: 1.1 * s });
+}
+appleTree(8.7, -4.6, 1.0);
+appleTree(-4.8, 8.7, 1.1);
+appleTree(-9.4, -1.4, 0.9);
+
+// --- hens pecking around the gate
+const hen = (c) => [
+  ico(0.13, 0, c, { y: 0.17, sx: 1.15, sy: 0.9 }),
+  ico(0.075, 0, c, { x: 0.11, y: 0.3 }),
+  cone(0.025, 0.06, 4, 0xe7a13a, { x: 0.19, y: 0.29, rz: -Math.PI / 2 }),
+  box(0.04, 0.05, 0.03, 0xd23a2a, { x: 0.11, y: 0.39 }),
+  box(0.025, 0.04, 0.02, 0xd23a2a, { x: 0.17, y: 0.25 }),
+  cone(0.08, 0.14, 4, c, { x: -0.14, y: 0.27, rz: 0.6 }),
+  box(0.02, 0.08, 0.02, 0xe7a13a, { y: 0.04, z: 0.04 }), box(0.02, 0.08, 0.02, 0xe7a13a, { y: 0.04, z: -0.04 }),
+];
+put(hen(0xa8552f), 1.5, 7.3, 2.2);
+put(hen(0xf3eee2), -1.3, 8.4, 0.4);
+put(hen(0x3a3434), 2.3, 9.0, -1.0);
+put(hen(0xa8552f), 3.6, -5.95, 2.9, 0.9);
+
+// --- dirt track from the gate to the field
+for (let k = 0; k < 9; k++) {
+  const z = 5.9 + k * 0.62;
+  D.push(cyl(0.52, 0.52, 0.03, 7, 0xa88660, { x: Math.sin(k * 0.9) * 0.12, y: GROUND + 0.012, z, ry: rand() * 3, sx: 1.25 }));
+}
+BLOCK.push({ x0: -0.9, x1: 0.9, z0: 5.5, z1: 11.5 });
+
+// --- wind pump (lattice tower) with a stock-water trough
+const PUMP = { x: -7.2, z: -6.1, ry: 0.53, H: 5.2 };
+{
+  const p = [], steel = 0x8e979d, steelD = 0x6f777d, B = 0.75, T = 0.16, H = PUMP.H;
+  const corners = [[1, 1], [1, -1], [-1, -1], [-1, 1]];
+  const leg = ([sx, sz], t) => [sx * (B + (T - B) * t), H * t, sz * (B + (T - B) * t)];
+  for (const c of corners) p.push(rod(leg(c, 0), leg(c, 1), 0.05, steel, 4));
+  const levels = [0, 0.2, 0.42, 0.64, 0.86];
+  for (let li = 1; li < levels.length; li++) {
+    for (let k = 0; k < 4; k++) {
+      const a = corners[k], b = corners[(k + 1) % 4];
+      p.push(rod(leg(a, levels[li]), leg(b, levels[li]), 0.024, steelD, 4));
+      p.push(rod(leg(a, levels[li - 1]), leg(b, levels[li]), 0.016, steelD, 3));
+    }
+  }
+  p.push(box(0.6, 0.05, 0.6, 0x7a5a3a, { y: H }));
+  p.push(box(0.16, 0.22, 0.5, 0x5f676d, { y: H + 0.16 }));
+  p.push(rod([0, H + 0.2, -0.2], [0, H + 0.24, -1.3], 0.025, steel, 4));
+  p.push(box(0.03, 0.55, 0.8, 0xc0432f, { y: H + 0.32, z: -1.45 }));
+  p.push(rod([0, 0, 0.0], [0, H, 0.0], 0.03, steelD, 4));                  // pump rod
+  p.push(cyl(0.09, 0.11, 0.5, 6, 0x5f676d, { y: 0.25 }));                  // pump head
+  p.push(rod([0, 0.4, 0], [0.75, 0.45, 0.75], 0.03, steelD, 4));           // spout toward the trough
+  put(p, PUMP.x, PUMP.z, PUMP.ry);
+  // trough next to the pump
+  const tr = [
+    box(1.4, 0.06, 0.6, 0x8d969c, { y: 0.06 }),
+    box(1.4, 0.4, 0.05, 0x8d969c, { y: 0.22, z: 0.275 }), box(1.4, 0.4, 0.05, 0x8d969c, { y: 0.22, z: -0.275 }),
+    box(0.05, 0.4, 0.6, 0x8d969c, { x: 0.675, y: 0.22 }), box(0.05, 0.4, 0.6, 0x8d969c, { x: -0.675, y: 0.22 }),
+  ];
+  for (let k = -2; k <= 2; k++) tr.push(box(0.03, 0.4, 0.62, 0x7a8288, { x: k * 0.3, y: 0.22 }));
+  const tx = PUMP.x + 1.05, tz = PUMP.z + 1.15;
+  put(tr, tx, tz, PUMP.ry + Math.PI / 4);
+  WATER.push(box(1.3, 0.02, 0.5, 0x5aa9c4, { x: tx, y: GROUND + 0.36, z: tz, ry: PUMP.ry + Math.PI / 4 }));
+  BLOCK.push({ x: PUMP.x, z: PUMP.z, r: 1.3 }, { x: tx, z: tz, r: 1.0 });
+}
+
+// --- red barn with a gambrel roof, white trim, and a tall silo beside it
+const BARN = { x: 3.4, z: -7.45, ry: 0.1 };
+{
+  const p = [], red = 0xb5402e, white = 0xf3eee2, roof = 0x50535c, W = 1.5, H1 = 1.35, H2 = 2.15, H3 = 2.6, X2 = 1.05, DEP = 2.6;
+  const prof = [[-W, 0], [W, 0], [W, H1], [X2, H2], [0, H3], [-X2, H2], [-W, H1]];
+  const body = new THREE.ExtrudeGeometry(new THREE.Shape(prof.map(([x, y]) => new THREE.Vector2(x, y))), { depth: DEP, bevelEnabled: false });
+  body.translate(0, 0, -DEP / 2);
+  p.push(part(body, red));
+  p.push(box(2 * W + 0.12, 0.16, DEP + 0.12, 0x9d968c, { y: 0.08 }));
+  for (let i = 2; i < 6; i++) {             // roof panels follow the gambrel edges
+    const [ax, ay] = prof[i], [bx, by] = prof[i + 1];
+    const dx = bx - ax, dy = by - ay, len = Math.hypot(dx, dy);
+    const nx = dy / len, ny = -dx / len;
+    p.push(box(len + 0.1, 0.08, DEP + 0.3, roof, { x: (ax + bx) / 2 + nx * 0.04, y: (ay + by) / 2 + ny * 0.04, rz: Math.atan2(dy, dx) }));
+  }
+  const fz = DEP / 2 + 0.02;
+  for (const zz of [fz, -fz]) for (const s of [-1, 1]) p.push(box(0.1, H1, 0.04, white, { x: s * (W - 0.05), y: H1 / 2, z: zz }));
+  p.push(box(1.1, 1.15, 0.04, 0x8f2f22, { y: 0.74, z: fz }));
+  p.push(box(1.24, 0.09, 0.05, white, { y: 1.35, z: fz + 0.01 }));
+  for (const s of [-1, 1]) {
+    p.push(box(0.08, 1.2, 0.05, white, { x: s * 0.59, y: 0.75, z: fz + 0.01 }));
+    p.push(box(0.07, 1.5, 0.05, white, { y: 0.74, z: fz + 0.012, rz: s * Math.atan2(1.1, 1.15) }));
+  }
+  p.push(box(0.62, 0.62, 0.03, white, { y: 1.86, z: fz }));
+  p.push(box(0.5, 0.5, 0.04, 0x8f2f22, { y: 1.86, z: fz + 0.01 }));
+  p.push(rod([0, H3 + 0.05, 0], [0, H3 + 0.55, 0], 0.02, 0x3a3a3a, 4));     // weathervane
+  p.push(box(0.4, 0.03, 0.03, 0x3a3a3a, { y: H3 + 0.45 }));
+  p.push(cone(0.06, 0.12, 4, 0x3a3a3a, { x: 0.22, y: H3 + 0.45, rz: -Math.PI / 2 }));
+  const sx = W + 0.95, sz = -0.35;                                         // big silo echoes the rook
+  p.push(cyl(0.75, 0.75, 3.6, 14, 0xd9d2c3, { x: sx, y: 1.8, z: sz }));
+  for (const y of [0.9, 1.8, 2.7]) p.push(cyl(0.77, 0.77, 0.07, 14, 0x9aa3a8, { x: sx, y, z: sz }));
+  p.push(dome(0.77, 14, 5, 0x8f979c, { x: sx, y: 3.6, z: sz }));
+  put(p, BARN.x, BARN.z, BARN.ry);
+  BLOCK.push({ x: BARN.x, z: BARN.z, r: 2.2 }, { x: BARN.x + 2.4, z: BARN.z - 0.6, r: 1.0 });
+}
+
+// --- seeded scatter: grass tufts and meadow flowers
+{
+  let placed = 0, tries = 0;
+  while (placed < 70 && tries++ < 900) {
+    const a = rand() * TAU, r = 5.8 + rand() * 4.8;
+    const x = Math.cos(a) * r, z = Math.sin(a) * r;
+    if (blocked(x, z, 0.2)) continue;
+    placed++;
+    if (placed % 3) {
+      for (let k = 0; k < 3; k++) {
+        D.push(cone(0.05, 0.26 + rand() * 0.14, 3, 0x8fbb62, { x: x + (rand() - 0.5) * 0.18, y: GROUND + 0.12, z: z + (rand() - 0.5) * 0.18, rz: (rand() - 0.5) * 0.5 }));
+      }
+    } else {
+      const c = [0xf6f1e4, 0xf4d34a, 0xe98aa8, 0xb48ee0][placed % 4];
+      for (let k = 0; k < 4; k++) {
+        const fx = x + (rand() - 0.5) * 0.4, fz = z + (rand() - 0.5) * 0.4;
+        D.push(rod([fx, GROUND, fz], [fx, GROUND + 0.14, fz], 0.008, 0x5f8f3e, 3));
+        D.push(ico(0.045, 0, c, { x: fx, y: GROUND + 0.16, z: fz, sy: 0.6 }));
+      }
+    }
+  }
+}
+
+decor.add(shadowed(new THREE.Mesh(tintFaces(merge(D), jitterTint(0.1)), vertexMaterial({ roughness: 0.85 }))));
+const water = new THREE.Mesh(merge(WATER), new THREE.MeshStandardMaterial({
+  vertexColors: true, flatShading: true, roughness: 0.12, metalness: 0.05, transparent: true, opacity: 0.9,
+}));
+water.receiveShadow = true;
+decor.add(water);
+
+// wind-pump fan: its own mesh so it can turn
+const fan = (() => {
+  const f = [], NB = 16;
+  for (let k = 0; k < NB; k++) {
+    const a = k / NB * TAU;
+    f.push(box(0.15, 0.62, 0.015, k % 4 === 0 ? 0xc0432f : 0xece6d6,
+      { x: Math.cos(a) * 0.68, y: Math.sin(a) * 0.68, rz: a - Math.PI / 2, ry: 0.35, order: 'ZYX' }));
+  }
+  f.push(part(new THREE.TorusGeometry(0.98, 0.022, 3, 24), 0x8e979d));
+  f.push(part(new THREE.TorusGeometry(0.4, 0.02, 3, 16), 0x8e979d));
+  f.push(cyl(0.08, 0.08, 0.14, 8, 0x5f676d, { rx: Math.PI / 2 }));
+  const m = shadowed(new THREE.Mesh(merge(f), vertexMaterial({ roughness: 0.7, side: THREE.DoubleSide })));
+  const holder = new THREE.Group();
+  holder.position.set(PUMP.x, GROUND, PUMP.z);
+  holder.rotation.y = PUMP.ry;
+  m.position.set(0, PUMP.H + 0.2, 0.3);
+  holder.add(m);
+  scene.add(holder);
+  return m;
+})();
+
+// Low-poly clouds, cream on top and warm underneath (morning)
+const clouds = new THREE.Group();
+scene.add(clouds);
+{
+  const topC = new THREE.Color(0xffffff), under = new THREE.Color(0xf4dcc4);
+  for (let i = 0; i < 7; i++) {
+    const parts = [];
+    const n = 3 + Math.floor(rand() * 3);
+    for (let k = 0; k < n; k++) {
+      const s = 0.8 + rand() * 0.9;
+      parts.push(part(new THREE.IcosahedronGeometry(s, 0), 0xffffff,
+        { x: (k - n / 2) * 1.1 + rand() * 0.4, y: rand() * 0.5, z: (rand() - 0.5) * 1.2, sy: 0.65, ry: rand() * 3 }));
+    }
+    const geo = tintFaces(merge(parts), (col, nrm) => col.copy(under).lerp(topC, THREE.MathUtils.clamp(nrm.y * 0.5 + 0.6, 0, 1)));
+    const m = new THREE.Mesh(geo, vertexMaterial({ roughness: 1 }));
+    const a = (i / 7) * TAU + rand() * 0.5, r = 19 + rand() * 6;
+    m.position.set(Math.cos(a) * r, 2 + rand() * 6, Math.sin(a) * r);
+    m.rotation.y = -a;
+    m.userData.bob = rand() * 6;
+    clouds.add(m);
+  }
+}
+
+// Big warm sun: painted onto the backdrop by riding on the camera far away,
+// so it always sits in the upper-right sky and is still occluded by the farm.
+const sunDisc = new THREE.Group();
+{
+  const halo = (() => {
+    const c = document.createElement('canvas');
+    c.width = c.height = 256;
+    const g = c.getContext('2d');
+    const grad = g.createRadialGradient(128, 128, 0, 128, 128, 128);
+    grad.addColorStop(0.0, 'rgba(255,240,200,0.95)');
+    grad.addColorStop(0.28, 'rgba(255,226,160,0.55)');
+    grad.addColorStop(0.6, 'rgba(255,214,150,0.16)');
+    grad.addColorStop(1.0, 'rgba(255,214,150,0)');
+    g.fillStyle = grad;
+    g.fillRect(0, 0, 256, 256);
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+  })();
+  const glow = new THREE.Mesh(new THREE.PlaneGeometry(6, 6),
+    new THREE.MeshBasicMaterial({ map: halo, transparent: true, depthWrite: false, fog: false, toneMapped: false }));
+  glow.position.z = -0.05;
+  const disc = new THREE.Mesh(new THREE.CircleGeometry(1, 40),
+    new THREE.MeshBasicMaterial({ color: 0xfff0c2, fog: false, toneMapped: false }));
+  sunDisc.add(glow, disc);
+  camera.add(sunDisc);
+}
+function placeSun() {
+  const Dz = 160, hh = Dz * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)), hw = hh * camera.aspect;
+  sunDisc.position.set(hw * 0.64, hh * 0.7, -Dz);
+  sunDisc.scale.setScalar(hh * 0.1);
+}
+
+// Butterflies: one instanced draw call, flapping by squashing the wing span
+const FLIES = 10;
+const flyGeo = new THREE.BufferGeometry();
+flyGeo.setAttribute('position', new THREE.Float32BufferAttribute([
+  0, 0, 0.02, -0.12, 0.01, 0.07, -0.1, 0, -0.07,
+  0, 0, 0.02, 0.1, 0, -0.07, 0.12, 0.01, 0.07,
+], 3));
+flyGeo.computeVertexNormals();
+const flies = new THREE.InstancedMesh(flyGeo, new THREE.MeshStandardMaterial({ side: THREE.DoubleSide, roughness: 0.8 }), FLIES);
+const flyData = [];
+for (let i = 0; i < FLIES; i++) {
+  let x, z, n = 0;
+  do { const a = rand() * TAU, r = 6 + rand() * 4; x = Math.cos(a) * r; z = Math.sin(a) * r; } while (blocked(x, z) && n++ < 40);
+  flyData.push({ x, z, r: 0.5 + rand() * 1.1, y: 0.35 + rand() * 1.1, v: (0.5 + rand() * 0.6) * (rand() < 0.5 ? -1 : 1), ph: rand() * TAU });
+  flies.setColorAt(i, new THREE.Color([0xfff6d8, 0xf6cf4a, 0xf39a4a, 0xbfe3ff][i % 4]));
+}
+flies.frustumCulled = false;
+scene.add(flies);
+const _o = new THREE.Object3D();
+
+// ---------------------------------------------------------------------------
+// Position and piece objects
+// ---------------------------------------------------------------------------
+const CHAR = { p: 'Farmhand pawn', r: 'Silo rook', n: 'Horse knight', b: 'Scarecrow bishop', q: 'Matriarch queen', k: 'Farmer king' };
+const sqName = (s) => 'abcdefgh'[s % 8] + ((s >> 3) + 1);
+const parseSq = (str) => (str.charCodeAt(0) - 97) + (Number(str[1]) - 1) * 8;
+const geoKey = (pc) => pc.color + pc.type + (pc.type === 'p' ? pc.variant : '');
+
+// Characters face the other family; horses stand in profile, turned toward the
+// centre files and angled at the enemy; a little seeded jitter feels hand-placed.
+function faceYaw(color, type, sq) {
+  const j = (hash3(sq, color === 'w' ? 1 : 2, 5) - 0.5) * 0.24;
+  if (type === 'n') {
+    const tilt = color === 'w' ? 0.45 : -0.45;
+    return ((sq % 8) < 4 ? tilt : Math.PI - tilt) + j * 0.5;
+  }
+  return (color === 'w' ? Math.PI : 0) + j;
+}
+
+let board = new Array(64).fill(null);
+const pieces = [];
+const pieceGroup = new THREE.Group();
+scene.add(pieceGroup);
+let clockT = 0;
+// The intro drop runs on (lightly capped) wall time rather than the 0.05 s-capped
+// sim clock, so a slow software renderer still shows the settled board quickly.
+let introT = 0;
+
+function makePiece(color, type, s, delay) {
+  const mat = new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.74, metalness: 0.02 });
+  const pc = { color, type, sq: s, variant: (s % 8) % 2, alive: true, scale: 1, lift: 0, liftGoal: 0, drop: delay };
+  pc.mesh = shadowed(new THREE.Mesh(GEO[geoKey(pc)], mat));
+  pc.mesh.rotation.y = faceYaw(color, type, s);
+  const [x, z] = sqToXZ(s % 8, s >> 3);
+  pc.base = new THREE.Vector3(x, TILE_TOP, z);
+  pc.mesh.userData.piece = pc;
+  pieceGroup.add(pc.mesh);
+  pieces.push(pc);
+  board[s] = pc;
+  return pc;
+}
+
+function setupPosition(animateIn) {
+  for (const pc of pieces) { pieceGroup.remove(pc.mesh); pc.mesh.material.dispose(); }
+  pieces.length = 0;
+  board = new Array(64).fill(null);
+  hovered = null;
+  const back = 'rnbqkbnr';
+  const t0 = introT + 0.15;
+  for (let f = 0; f < 8; f++) {
+    const d = (i) => (animateIn && !reduceMotion ? t0 + i : null);
+    makePiece('w', back[f], f, d(f * 0.05));
+    makePiece('w', 'p', 8 + f, d(0.4 + f * 0.04));
+    makePiece('b', 'p', 48 + f, d(0.4 + f * 0.04));
+    makePiece('b', back[f], 56 + f, d(f * 0.05));
+  }
+  highlight(null, null);
+}
+
+// ---------------------------------------------------------------------------
+// Move playback (UCI). Handles captures, castling, en passant, promotion.
+// It replays a given move list; it does not check legality.
+// ---------------------------------------------------------------------------
+const DEMO = 'e2e4 e7e5 g1f3 b8c6 f1c4 f8c5 c2c3 g8f6 d2d4 e5d4 c3d4 c5b4 b1c3 f6e4 e1g1 b4c3 b2c3 d7d5'.split(' ');
+const DEMO_SAN = ['e4', 'e5', 'Nf3', 'Nc6', 'Bc4', 'Bc5', 'c3', 'Nf6', 'd4', 'exd4', 'cxd4', 'Bb4+', 'Nc3', 'Nxe4', 'O-O', 'Bxc3', 'bxc3', 'd5'];
+const fromHash = (() => {
+  const m = location.hash.match(/moves=([a-h1-8qrbn,\s%20+]+)/i);
+  if (!m) return null;
+  const list = decodeURIComponent(m[1]).toLowerCase().split(/[,\s+]+/).filter((u) => /^[a-h][1-8][a-h][1-8][qrbn]?$/.test(u));
+  return list.length ? list : null;
+})();
+const line = fromHash || DEMO;
+const lineSan = fromHash ? null : DEMO_SAN;
+const anims = [];
+let ply = 0, playing = false, nextAt = 0;
+
+const statusEl = $('status');
+function setStatus() {
+  if (ply === 0) {
+    statusEl.innerHTML = `<b>Opening position</b> · Redbarn (White) to move${fromHash ? ` · ${line.length} moves loaded from URL` : ''}`;
+    return;
+  }
+  const label = (i) => (lineSan ? lineSan[i] : line[i]);
+  const parts = [];
+  for (let i = Math.max(0, ply - 6); i < ply; i++) {
+    const num = (i >> 1) + 1;
+    parts.push(i % 2 === 0 ? `${num}. ${label(i)}` : (i === Math.max(0, ply - 6) ? `${num}… ${label(i)}` : label(i)));
+  }
+  const name = fromHash ? 'Game from URL' : 'Italian Game, Møller line';
+  const toMove = ply % 2 === 0 ? 'Redbarn' : 'Sagebrook';
+  statusEl.innerHTML = `<b>${name}</b> · ply ${ply}/${line.length} · ${toMove} to move<br>${parts.join(' ')}`;
+}
+
+function animateTo(pc, toSq, dur, arc) {
+  const [x, z] = sqToXZ(toSq % 8, toSq >> 3);
+  anims.push({ pc, from: pc.base.clone(), to: new THREE.Vector3(x, TILE_TOP, z), t: 0, dur, arc });
+}
+function capture(pc) {
+  if (!pc) return;
+  board[pc.sq] = null;
+  pc.alive = false;
+  anims.push({ pc, t: 0, dur: 0.45, kill: true, delay: 0.22 });
+}
+
+function applyMove(uci) {
+  const from = parseSq(uci.slice(0, 2)), to = parseSq(uci.slice(2, 4));
+  const pc = board[from];
+  if (!pc) { console.warn('No piece on', uci.slice(0, 2)); return false; }
+  const dist = Math.hypot((to % 8) - (from % 8), (to >> 3) - (from >> 3));
+  const speed = reduceMotion ? 0.01 : 1;
+  let victim = board[to];
+  if (pc.type === 'p' && (to % 8) !== (from % 8) && !victim) victim = board[(from & ~7) | (to % 8)]; // en passant
+  capture(victim);
+  board[from] = null; board[to] = pc; pc.sq = to;
+  animateTo(pc, to, (0.42 + dist * 0.05) * speed, pc.type === 'n' ? 0.85 : 0.28 + dist * 0.04);
+  const moveAnim = anims[anims.length - 1];
+  if (pc.type === 'k' && Math.abs((to % 8) - (from % 8)) === 2) { // castling: the silo moves too
+    const rank = from & ~7, kingside = to % 8 === 6;
+    const rook = board[rank + (kingside ? 7 : 0)];
+    if (rook) {
+      const rTo = rank + (kingside ? 5 : 3);
+      board[rook.sq] = null; board[rTo] = rook; rook.sq = rTo;
+      animateTo(rook, rTo, 0.6 * speed, 0.55);
+    }
+  }
+  if (uci[4]) moveAnim.promote = uci[4];
+  highlight(from, to);
+  return true;
+}
+
+function setPlaying(on) {
+  playing = on;
+  $('playBtn').textContent = on ? '❚❚ Pause'
+    : ply >= line.length ? '↺ Replay'
+    : ply > 0 ? '▶ Resume'
+    : fromHash ? '▶ Play game' : '▶ Play opening';
+}
+
+const easeInOut = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+const bounce = (t) => {
+  const n = 7.5625, d = 2.75;
+  if (t < 1 / d) return n * t * t;
+  if (t < 2 / d) return n * (t -= 1.5 / d) * t + 0.75;
+  if (t < 2.5 / d) return n * (t -= 2.25 / d) * t + 0.9375;
+  return n * (t -= 2.625 / d) * t + 0.984375;
+};
+
+function stepAnims(dt) {
+  for (let i = anims.length - 1; i >= 0; i--) {
+    const a = anims[i];
+    if (a.delay > 0) { a.delay -= dt; continue; }
+    a.t = Math.min(1, a.t + dt / a.dur);
+    if (a.kill) {
+      a.pc.scale = 1 - easeInOut(a.t);
+      a.pc.lift = -0.25 * a.t;
+      if (a.t >= 1) {
+        pieceGroup.remove(a.pc.mesh);
+        a.pc.mesh.material.dispose();
+        pieces.splice(pieces.indexOf(a.pc), 1);
+      }
+    } else {
+      const e = easeInOut(a.t);
+      a.pc.base.lerpVectors(a.from, a.to, e);
+      a.pc.base.y = TILE_TOP + a.arc * 4 * e * (1 - e);
+      if (a.t >= 1 && a.promote) {
+        a.pc.type = a.promote;
+        a.pc.mesh.geometry = GEO[geoKey(a.pc)];
+        a.pc.mesh.rotation.y = faceYaw(a.pc.color, a.pc.type, a.pc.sq);
+      }
+    }
+    if (a.t >= 1) anims.splice(i, 1);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Orbit controls written inline (yaw / pitch / radius with damping), plus
+// click-a-character to focus. #cam=yaw,pitch,radius[,x,y,z] sets a fixed view.
+// ---------------------------------------------------------------------------
+let autoRotate = !reduceMotion;
+let lastInteract = -10;
+let drag = null;
+const raycaster = new THREE.Raycaster();
+const ndc = new THREE.Vector2();
+let hovered = null;
+const tip = $('tip');
+
+function setAutoRotate(on) {
+  autoRotate = on;
+  $('rotateBtn').textContent = `Auto-rotate: ${on ? 'on' : 'off'}`;
+  $('rotateBtn').setAttribute('aria-pressed', String(on));
+}
+const camHash = location.hash.match(/cam=(-?[\d.]+(?:,-?[\d.]+){2,5})/);
+if (camHash) {
+  const v = camHash[1].split(',').map(Number);
+  Object.assign(view, { yaw: v[0], pitch: v[1], radius: v[2] });
+  Object.assign(goal, view);
+  if (v.length >= 6) { target.set(v[3], v[4], v[5]); goalTarget.copy(target); }
+  autoRotate = false;
+}
+setAutoRotate(autoRotate);
+
+function pickPiece(e) {
+  ndc.set((e.clientX / innerWidth) * 2 - 1, -(e.clientY / innerHeight) * 2 + 1);
+  raycaster.setFromCamera(ndc, camera);
+  const hit = raycaster.intersectObjects(pieceGroup.children, false)[0];
+  return hit && hit.object.userData.piece.alive ? hit.object.userData.piece : null;
+}
+function setHovered(pc) {
+  if (pc === hovered) return;
+  if (hovered) { hovered.liftGoal = 0; hovered.mesh.material.emissive.setHex(0x000000); }
+  hovered = pc;
+  if (pc) { pc.liftGoal = 0.14; pc.mesh.material.emissive.setHex(pc.color === 'w' ? 0x2a2214 : 0x14262e); }
+}
+function resetView() {
+  goal.yaw = HOME.yaw; goal.pitch = HOME.pitch; goal.radius = fitRadius();
+  goalTarget.copy(HOME_TARGET);
+}
+
+canvas.addEventListener('pointerdown', (e) => {
+  drag = { x: e.clientX, y: e.clientY, yaw: goal.yaw, pitch: goal.pitch, id: e.pointerId, moved: 0 };
+  canvas.setPointerCapture(e.pointerId);
+  lastInteract = clockT;
+  canvas.style.cursor = 'grabbing';
+});
+canvas.addEventListener('pointermove', (e) => {
+  if (drag && drag.id === e.pointerId) {
+    drag.moved = Math.max(drag.moved, Math.hypot(e.clientX - drag.x, e.clientY - drag.y));
+    goal.yaw = drag.yaw - (e.clientX - drag.x) * 0.006;
+    goal.pitch = THREE.MathUtils.clamp(drag.pitch + (e.clientY - drag.y) * 0.005, 0.2, 1.38);
+    lastInteract = clockT;
+    return;
+  }
+  const pc = pickPiece(e);
+  setHovered(pc);
+  canvas.style.cursor = pc ? 'pointer' : 'grab';
+  if (pc) {
+    tip.innerHTML = `${CHAR[pc.type]} · ${sqName(pc.sq)}<span>${FAM[pc.color].name}</span>`;
+    tip.style.transform = `translate(${e.clientX + 14}px, ${e.clientY - 34}px)`;
+    tip.classList.add('on');
+  } else tip.classList.remove('on');
+});
+const endDrag = (e) => {
+  if (!drag || drag.id !== e.pointerId) return;
+  const click = drag.moved < 5;
+  drag = null;
+  canvas.style.cursor = 'grab';
+  if (canvas.hasPointerCapture(e.pointerId)) canvas.releasePointerCapture(e.pointerId);
+  if (click && e.type === 'pointerup') {
+    const pc = pickPiece(e);
+    if (pc) { // focus the camera on this character
+      goalTarget.set(pc.base.x, TILE_TOP + 0.6, pc.base.z);
+      goal.radius = 6.5;
+      goal.pitch = Math.min(goal.pitch, 0.62);
+      lastInteract = clockT;
+    }
+  }
+};
+canvas.addEventListener('pointerup', endDrag);
+canvas.addEventListener('pointercancel', endDrag);
+canvas.addEventListener('pointerleave', () => { tip.classList.remove('on'); setHovered(null); });
+canvas.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  goal.radius = THREE.MathUtils.clamp(goal.radius * (1 + Math.sign(e.deltaY) * 0.08), 4, 40);
+  lastInteract = clockT;
+}, { passive: false });
+
+// ---------------------------------------------------------------------------
+// UI wiring
+// ---------------------------------------------------------------------------
+function togglePlay() {
+  if (ply >= line.length) { anims.length = 0; setupPosition(false); ply = 0; setStatus(); }
+  setPlaying(!playing);
+  nextAt = clockT + 0.2;
+}
+function reset() {
+  anims.length = 0;
+  ply = 0;
+  setPlaying(false);
+  setupPosition(true);
+  setStatus();
+}
+$('playBtn').onclick = togglePlay;
+$('resetBtn').onclick = reset;
+$('rotateBtn').onclick = () => setAutoRotate(!autoRotate);
+$('viewBtn').onclick = resetView;
+addEventListener('keydown', (e) => {
+  if (e.target.closest && e.target.closest('button') && (e.key === ' ' || e.key === 'Enter')) return;
+  if (e.key === 'r' || e.key === 'R') setAutoRotate(!autoRotate);
+  else if (e.key === 'Escape') resetView();
+  else if (e.key === ' ') { e.preventDefault(); togglePlay(); }
+});
+
+function onResize() {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+  placeSun();
+  const r = fitRadius();
+  if (!camHash && goal.radius < r) goal.radius = view.radius = r;
+}
+addEventListener('resize', onResize);
+
+// ---------------------------------------------------------------------------
+// Start
+// ---------------------------------------------------------------------------
+onResize();
+setupPosition(!camHash);
+setStatus();
+setPlaying(false);
+if (fromHash) { setPlaying(true); nextAt = 1.6; }
+canvas.style.cursor = 'grab';
+
+const clock = new THREE.Clock();
+renderer.setAnimationLoop(() => {
+  const raw = clock.getDelta();
+  const dt = Math.min(raw, 0.05);
+  clockT += dt;
+  introT += Math.min(raw, 0.25);
+
+  // camera
+  if (autoRotate && !drag && clockT - lastInteract > 4) goal.yaw += dt * 0.055;
+  const k = 1 - Math.exp(-dt * 7);
+  view.yaw += (goal.yaw - view.yaw) * k;
+  view.pitch += (goal.pitch - view.pitch) * k;
+  view.radius += (goal.radius - view.radius) * k;
+  target.lerp(goalTarget, k);
+  updateCamera();
+
+  // move playback
+  if (playing && anims.length === 0 && clockT >= nextAt) {
+    if (ply < line.length) {
+      applyMove(line[ply]);
+      ply++;
+      setStatus();
+      nextAt = clockT + (reduceMotion ? 0.6 : 1.05);
+    } else setPlaying(false);
+  }
+  stepAnims(dt);
+
+  // pieces: intro drop + hover lift
+  for (const pc of pieces) {
+    let dropY = 0;
+    if (pc.drop != null) {
+      const t = (introT - pc.drop) / 0.7;
+      if (t < 0) dropY = 6; else if (t < 1) dropY = 6 * (1 - bounce(t)); else pc.drop = null;
+    }
+    if (pc.alive) pc.lift += (pc.liftGoal - pc.lift) * (1 - Math.exp(-dt * 12));
+    pc.mesh.position.set(pc.base.x, pc.base.y + pc.lift + dropY, pc.base.z);
+    pc.mesh.scale.setScalar(Math.max(pc.scale, 0.001));
+  }
+
+  // ambient life (frozen under prefers-reduced-motion)
+  const tt = reduceMotion ? 0 : clockT;
+  if (!reduceMotion) {
+    fan.rotation.z -= dt * 1.6;
+    clouds.rotation.y += dt * 0.006;
+    for (const c of clouds.children) c.position.y += Math.sin(clockT * 0.4 + c.userData.bob) * dt * 0.08;
+  }
+  for (let i = 0; i < FLIES; i++) {
+    const f = flyData[i];
+    const a = f.ph + tt * f.v;
+    const x = f.x + Math.cos(a) * f.r, z = f.z + Math.sin(a * 1.3) * f.r * 0.7;
+    _o.position.set(x, GROUND + f.y + Math.sin(tt * 2.1 + f.ph) * 0.12, z);
+    _o.rotation.set(0, -a + (f.v > 0 ? 0 : Math.PI), 0);
+    _o.scale.set(0.25 + 0.75 * Math.abs(Math.sin(tt * 13 + f.ph * 3)) + (reduceMotion ? 0.6 : 0), 1, 1);
+    _o.updateMatrix();
+    flies.setMatrixAt(i, _o.matrix);
+  }
+  flies.instanceMatrix.needsUpdate = true;
+
+  renderer.render(scene, camera);
+});
+</script>
+</body>
+</html>
